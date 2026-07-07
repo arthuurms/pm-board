@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { User } from "@/types";
 import { ACTION_LABELS, ALL_ACTIONS } from "@/lib/permissions";
-import { Users, Plus, Shield, Check, X } from "lucide-react";
+import { Users, Plus, Shield, Check, Pencil, Trash2, X } from "lucide-react";
 
 interface UserWithPerms extends User {
   permissions?: Record<string, boolean>;
@@ -17,10 +17,22 @@ export default function UsersPage() {
   const [myPermissions, setMyPermissions] = useState<Record<string, boolean>>({});
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Create modal
   const [showForm, setShowForm] = useState(false);
   const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "collaborator", position: "" });
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Edit modal
+  const [editUser, setEditUser] = useState<UserWithPerms | null>(null);
+  const [editData, setEditData] = useState({ email: "", password: "" });
+  const [editError, setEditError] = useState("");
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  // Delete confirm
+  const [deleteUser, setDeleteUser] = useState<UserWithPerms | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -70,6 +82,40 @@ export default function UsersPage() {
     load();
   }
 
+  async function submitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editUser) return;
+    if (!editData.email && !editData.password) {
+      setEditError("Informe ao menos email ou nova senha.");
+      return;
+    }
+    setEditSubmitting(true);
+    setEditError("");
+    const res = await fetch(`/api/users/${editUser.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editData),
+    });
+    setEditSubmitting(false);
+    if (!res.ok) { setEditError((await res.json()).error); return; }
+    setEditUser(null);
+    setEditData({ email: "", password: "" });
+    load();
+  }
+
+  async function confirmDelete() {
+    if (!deleteUser) return;
+    setDeleteSubmitting(true);
+    const res = await fetch(`/api/users/${deleteUser.id}`, { method: "DELETE" });
+    setDeleteSubmitting(false);
+    if (!res.ok) {
+      alert((await res.json()).error);
+      return;
+    }
+    setDeleteUser(null);
+    load();
+  }
+
   const canManage = myPermissions.manage_permissions;
 
   return (
@@ -105,18 +151,37 @@ export default function UsersPage() {
                     <p className="text-xs text-gray-500">{user.email} {user.position ? `• ${user.position}` : ""}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <span className={`text-xs px-2 py-0.5 rounded font-medium ${user.role === "admin" ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-600"}`}>
                     {user.role === "admin" ? "Admin / PM" : "Colaborador"}
                   </span>
                   {canManage && (
-                    <button
-                      onClick={() => loadUserPerms(user.id)}
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-violet-600 px-2 py-1 rounded hover:bg-violet-50 transition-colors"
-                    >
-                      <Shield className="w-3.5 h-3.5" />
-                      {expandedUser === user.id ? "Fechar" : "Permissões"}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => loadUserPerms(user.id)}
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-violet-600 px-2 py-1 rounded hover:bg-violet-50 transition-colors"
+                        title="Permissões"
+                      >
+                        <Shield className="w-3.5 h-3.5" />
+                        {expandedUser === user.id ? "Fechar" : "Permissões"}
+                      </button>
+                      <button
+                        onClick={() => { setEditUser(user); setEditData({ email: user.email, password: "" }); setEditError(""); }}
+                        className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Editar email/senha"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {user.id !== currentUserId && (
+                        <button
+                          onClick={() => setDeleteUser(user)}
+                          className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Excluir usuário"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -152,11 +217,14 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* New user form */}
+      {/* Create modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="px-6 py-4 border-b"><h2 className="text-lg font-semibold">Novo Usuário</h2></div>
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Novo Usuário</h2>
+              <button onClick={() => setShowForm(false)}><X className="w-4 h-4 text-gray-400" /></button>
+            </div>
             <form onSubmit={createUser} className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
@@ -191,6 +259,65 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Editar — {editUser.name}</h2>
+              <button onClick={() => setEditUser(null)}><X className="w-4 h-4 text-gray-400" /></button>
+            </div>
+            <form onSubmit={submitEdit} className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  value={editData.email}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  placeholder="Novo email"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nova senha</label>
+                <input
+                  type="password"
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  value={editData.password}
+                  onChange={(e) => setEditData({ ...editData, password: e.target.value })}
+                  placeholder="Deixe em branco para não alterar"
+                />
+              </div>
+              {editError && <p className="text-sm text-red-600">{editError}</p>}
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setEditUser(null)} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">Cancelar</button>
+                <button type="submit" disabled={editSubmitting} className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                  {editSubmitting ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {deleteUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-semibold mb-2">Excluir usuário</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Tem certeza que deseja excluir <strong>{deleteUser.name}</strong>? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteUser(null)} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">Cancelar</button>
+              <button onClick={confirmDelete} disabled={deleteSubmitting} className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                {deleteSubmitting ? "Excluindo..." : "Excluir"}
+              </button>
+            </div>
           </div>
         </div>
       )}
