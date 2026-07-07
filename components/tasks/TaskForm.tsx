@@ -1,20 +1,49 @@
 "use client";
 import { useState } from "react";
-import { User } from "@/types";
+import { User, Task } from "@/types";
+import { X, Zap } from "lucide-react";
 
 interface Props {
   users: User[];
   onCreated: () => void;
   onClose: () => void;
+  editTask?: Task | null;
 }
 
-export default function TaskForm({ users, onCreated, onClose }: Props) {
+function todayAt(hour: number, minute = 0) {
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
+
+function toLocalInput(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const SHORTCUTS = [
+  { label: "Hoje 18h", getValue: () => toLocalInput(todayAt(18)) },
+  { label: "Amanhã 9h", getValue: () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return toLocalInput(d); } },
+  { label: "Em 3 dias", getValue: () => { const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(18, 0, 0, 0); return toLocalInput(d); } },
+  { label: "Semana que vem", getValue: () => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(18, 0, 0, 0); return toLocalInput(d); } },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: "low", label: "Baixa", color: "bg-slate-100 text-slate-600 border-slate-200" },
+  { value: "medium", label: "Média", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { value: "high", label: "Alta", color: "bg-orange-100 text-orange-700 border-orange-200" },
+  { value: "urgent", label: "Urgente", color: "bg-red-100 text-red-700 border-red-200" },
+];
+
+export default function TaskForm({ users, onCreated, onClose, editTask }: Props) {
+  const isEdit = !!editTask;
+
   const [form, setForm] = useState({
-    title: "",
-    description: "",
-    priority: "medium",
-    dueDate: "",
-    assigneeId: users[0]?.id || "",
+    title: editTask?.title ?? "",
+    description: editTask?.description ?? "",
+    priority: editTask?.priority ?? "medium",
+    dueDate: editTask?.dueDate ? toLocalInput(new Date(editTask.dueDate)) : "",
+    assigneeId: editTask?.assigneeId ?? users[0]?.id ?? "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -23,15 +52,18 @@ export default function TaskForm({ users, onCreated, onClose }: Props) {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const res = await fetch("/api/tasks", {
-      method: "POST",
+
+    const url = isEdit ? `/api/tasks/${editTask!.id}` : "/api/tasks";
+    const method = isEdit ? "PATCH" : "POST";
+
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
     setLoading(false);
     if (!res.ok) {
-      const d = await res.json();
-      setError(d.error || "Erro ao criar tarefa");
+      setError((await res.json()).error || "Erro ao salvar tarefa");
       return;
     }
     onCreated();
@@ -41,53 +73,84 @@ export default function TaskForm({ users, onCreated, onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">Nova Tarefa</h2>
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{isEdit ? "Editar Tarefa" : "Nova Tarefa"}</h2>
+          <button onClick={onClose}><X className="w-4 h-4 text-gray-400" /></button>
         </div>
+
         <form onSubmit={submit} className="px-6 py-4 space-y-4">
+          {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
             <input
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              placeholder="O que precisa ser feito?"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
+              autoFocus
             />
           </div>
+
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
             <textarea
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
-              rows={3}
+              rows={2}
+              placeholder="Detalhes opcionais..."
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
-              <select
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value })}
-              >
-                <option value="low">Baixa</option>
-                <option value="medium">Média</option>
-                <option value="high">Alta</option>
-                <option value="urgent">Urgente</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prazo *</label>
-              <input
-                type="datetime-local"
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                required
-              />
+
+          {/* Priority chips */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Prioridade</label>
+            <div className="flex gap-2 flex-wrap">
+              {PRIORITY_OPTIONS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, priority: p.value })}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                    form.priority === p.value
+                      ? p.color + " ring-2 ring-offset-1 ring-violet-400"
+                      : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Due date + shortcuts */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Prazo *</label>
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {SHORTCUTS.map((s) => (
+                <button
+                  key={s.label}
+                  type="button"
+                  onClick={() => setForm({ ...form, dueDate: s.getValue() })}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
+                >
+                  <Zap className="w-3 h-3" />
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="datetime-local"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+              required
+            />
+          </div>
+
+          {/* Assignee */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Responsável *</label>
             <select
@@ -113,7 +176,7 @@ export default function TaskForm({ users, onCreated, onClose }: Props) {
               disabled={loading}
               className="px-4 py-2 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
             >
-              {loading ? "Criando..." : "Criar Tarefa"}
+              {loading ? (isEdit ? "Salvando..." : "Criando...") : (isEdit ? "Salvar" : "Criar Tarefa")}
             </button>
           </div>
         </form>

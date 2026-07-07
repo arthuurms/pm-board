@@ -20,7 +20,7 @@ export default function TasksPage() {
   const [view, setView] = useState<ViewMode>("board");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showForm, setShowForm] = useState(false);
-  // Admin can filter by person; collaborators see only their own tasks
+  const [editTask, setEditTask] = useState<Task | null>(null);
   const [filterUser, setFilterUser] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState("");
   const [loading, setLoading] = useState(true);
@@ -41,8 +41,6 @@ export default function TasksPage() {
     setLoading(true);
     const params = new URLSearchParams();
 
-    // Collaborators always see only their own tasks
-    // Admins can filter by a selected person, defaulting to all
     if (!isAdmin) {
       params.set("assigneeId", currentUser.id);
     } else if (filterUser) {
@@ -64,7 +62,6 @@ export default function TasksPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
-    // Optimistically update, then refetch to get server fields (onTime, completedAt)
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: newStatus as Task["status"] } : t));
     load();
   }
@@ -83,6 +80,11 @@ export default function TasksPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ addRework: true }),
     });
+    load();
+  }
+
+  async function deleteTask(taskId: string) {
+    await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
     load();
   }
 
@@ -121,7 +123,6 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Filters — admin only sees person filter */}
       <div className="flex flex-wrap gap-3 mb-5">
         {isAdmin && (
           <select
@@ -153,8 +154,11 @@ export default function TasksPage() {
           tasks={tasks}
           permissions={permissions}
           onStatusChange={changeStatus}
-          onMarkRework={markRework} onRemoveRework={removeRework}
+          onMarkRework={markRework}
+          onRemoveRework={removeRework}
           onTaskClick={setSelectedTask}
+          onEdit={setEditTask}
+          onDelete={isAdmin ? deleteTask : undefined}
         />
       )}
 
@@ -167,7 +171,10 @@ export default function TasksPage() {
               task={t}
               permissions={permissions}
               onStatusChange={changeStatus}
-              onMarkRework={markRework} onRemoveRework={removeRework}
+              onMarkRework={markRework}
+              onRemoveRework={removeRework}
+              onEdit={setEditTask}
+              onDelete={isAdmin ? deleteTask : undefined}
               onClick={() => setSelectedTask(t)}
             />
           ))}
@@ -177,8 +184,13 @@ export default function TasksPage() {
       {selectedTask && (
         <TaskDetail task={selectedTask} onClose={() => { setSelectedTask(null); load(); }} />
       )}
-      {showForm && (
-        <TaskForm users={users} onCreated={load} onClose={() => setShowForm(false)} />
+      {(showForm || editTask) && (
+        <TaskForm
+          users={users}
+          onCreated={load}
+          onClose={() => { setShowForm(false); setEditTask(null); }}
+          editTask={editTask}
+        />
       )}
     </div>
   );

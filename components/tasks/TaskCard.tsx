@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Task } from "@/types";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X } from "lucide-react";
+import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2 } from "lucide-react";
 import clsx from "clsx";
 
 interface Props {
@@ -11,6 +11,8 @@ interface Props {
   onStatusChange: (taskId: string, newStatus: string) => void;
   onMarkRework: (taskId: string) => void;
   onRemoveRework: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (taskId: string) => void;
   onClick: () => void;
 }
 
@@ -77,9 +79,10 @@ function ConfirmRework({ taskTitle, onConfirm, onCancel }: {
   );
 }
 
-export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onClick }: Props) {
+export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onEdit, onDelete, onClick }: Props) {
   const overdue = isOverdue(task);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   function handleAddRework() {
     setShowConfirm(true);
@@ -124,7 +127,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           <StatusBadge status={task.status} />
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mb-2">
           <span className="flex items-center gap-1">
             <User2 className="w-3 h-3" />
             {task.assignee.name}
@@ -133,6 +136,10 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
             <Calendar className="w-3 h-3" />
             {fmtDate(task.dueDate)}
             {overdue && " • Atrasada"}
+          </span>
+          <span className="flex items-center gap-1 text-gray-400">
+            <Clock className="w-3 h-3" />
+            Criado {fmtDateTime(task.createdAt)} por {task.creator.name}
           </span>
         </div>
 
@@ -177,6 +184,24 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
             </button>
           )}
 
+          {onEdit && (
+            <button
+              onClick={() => onEdit(task)}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+              title="Editar tarefa"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+              title="Excluir tarefa"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
           {permissions.mark_rework && (
             <div className="flex items-center gap-0.5">
               {/* Remove one rework — only visible when count > 0 */}
@@ -211,6 +236,25 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           )}
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </div>
+              <p className="font-semibold text-gray-900 text-sm">Excluir tarefa?</p>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">Esta ação não pode ser desfeita:</p>
+            <p className="text-sm font-medium text-gray-800 bg-gray-50 rounded-lg px-3 py-2 mb-4 truncate">{task.title}</p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button onClick={() => { setShowDeleteConfirm(false); onDelete!(task.id); }} className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConfirm && (
         <ConfirmRework
