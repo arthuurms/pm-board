@@ -26,7 +26,7 @@ export default function UsersPage() {
 
   // Edit modal
   const [editUser, setEditUser] = useState<UserWithPerms | null>(null);
-  const [editData, setEditData] = useState({ email: "", password: "" });
+  const [editData, setEditData] = useState({ name: "", email: "", password: "" });
   const [editError, setEditError] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
 
@@ -85,8 +85,8 @@ export default function UsersPage() {
   async function submitEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editUser) return;
-    if (!editData.email && !editData.password) {
-      setEditError("Informe ao menos email ou nova senha.");
+    if (!editData.name && !editData.email && !editData.password) {
+      setEditError("Informe ao menos um campo para alterar.");
       return;
     }
     setEditSubmitting(true);
@@ -99,7 +99,7 @@ export default function UsersPage() {
     setEditSubmitting(false);
     if (!res.ok) { setEditError((await res.json()).error); return; }
     setEditUser(null);
-    setEditData({ email: "", password: "" });
+    setEditData({ name: "", email: "", password: "" });
     load();
   }
 
@@ -166,7 +166,7 @@ export default function UsersPage() {
                         {expandedUser === user.id ? "Fechar" : "Permissões"}
                       </button>
                       <button
-                        onClick={() => { setEditUser(user); setEditData({ email: user.email, password: "" }); setEditError(""); }}
+                        onClick={() => { setEditUser(user); setEditData({ name: user.name, email: user.email, password: "" }); setEditError(""); }}
                         className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
                         title="Editar email/senha"
                       >
@@ -272,6 +272,16 @@ export default function UsersPage() {
               <button onClick={() => setEditUser(null)}><X className="w-4 h-4 text-gray-400" /></button>
             </div>
             <form onSubmit={submitEdit} className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                <input
+                  type="text"
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  placeholder="Nome do usuário"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
