@@ -6,8 +6,8 @@ import { ChevronRight } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@pm.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
           <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center">
             <ChevronRight className="w-6 h-6 text-white" />
           </div>
-          <span className="text-white text-2xl font-bold">PM Board</span>
+          <span className="text-white text-2xl font-bold">Fourfy Board</span>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -75,14 +75,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t">
-            <p className="text-xs text-gray-400 font-medium mb-2">Contas de teste:</p>
-            <div className="space-y-1 text-xs text-gray-500">
-              <p>admin@pm.com / admin123 — PM (admin)</p>
-              <p>joao@pm.com / user123 — Colaborador</p>
-              <p>maria@pm.com / user123 — Colaborador</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
