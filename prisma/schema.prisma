@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("collaborator") // admin | collaborator
+  position  String?
+  createdAt DateTime @default(now())
+
+  assignedTasks  Task[]          @relation("AssignedTasks")
+  createdTasks   Task[]          @relation("CreatedTasks")
+  statusChanges  StatusHistory[]
+  incidents      Incident[]
+  permissions    UserPermission[]
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  priority    String    @default("medium") // low | medium | high | urgent
+  status      String    @default("pending") // pending | in_progress | completed
+  isRework    Boolean   @default(false)
+  reworkCount Int       @default(0) // increments each time task is marked as rework
+  onTime      Boolean?  // calculated on completion
+
+  dueDate     DateTime
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  assigneeId String
+  assignee   User   @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  creatorId  String
+  creator    User   @relation("CreatedTasks", fields: [creatorId], references: [id])
+
+  originalTaskId String?
+  originalTask   Task?   @relation("ReworkOf", fields: [originalTaskId], references: [id])
+  reworkTasks    Task[]  @relation("ReworkOf")
+
+  statusHistory StatusHistory[]
+}
+
+model StatusHistory {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  changedById String
+  changedBy  User     @relation(fields: [changedById], references: [id])
+  changedAt  DateTime @default(now())
+  note       String?
+}
+
+model Incident {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  category     String   // ops_down | service_failure | revenue_loss
+  severity     String   // low | medium | high | critical
+  occurredAt   DateTime
+  createdAt    DateTime @default(now())
+  reportedById String
+  reportedBy   User     @relation(fields: [reportedById], references: [id])
+  relatedUserId String?
+}
+
+// Granular per-user permissions
+// action: create_task | move_in_progress | move_completed | mark_rework | create_incident | manage_permissions
+model UserPermission {
+  id      String  @id @default(cuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action  String
+  granted Boolean @default(true)
+
+  @@unique([userId, action])
+}

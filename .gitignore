@@ -30,8 +30,14 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — .env.example é commitado, .env não
+.env
+.env.local
+
+# SQLite (não usado nesta versão)
+*.db
+
+# Migrations são commitadas (necessário para prisma migrate deploy)
 
 # vercel
 .vercel
