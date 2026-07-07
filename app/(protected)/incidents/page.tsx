@@ -111,6 +111,11 @@ export default function IncidentsPage() {
                 </span>
                 <span>Ocorrido: {new Date(inc.occurredAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
                 <span>Reportado por: {inc.reportedBy.name}</span>
+                {inc.relatedUserId && (
+                  <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 px-2 py-0.5 rounded font-medium">
+                    Relacionado: {users.find((u) => u.id === inc.relatedUserId)?.name ?? "—"}
+                  </span>
+                )}
               </div>
             </div>
           ))}
@@ -137,6 +142,13 @@ export default function IncidentsPage() {
                     <option value="ops_down">Operação fora do ar</option>
                     <option value="service_failure">Falha de atendimento</option>
                     <option value="revenue_loss">Perda de venda/dado</option>
+                    <option value="communication">Falha de comunicação</option>
+                    <option value="deadline_miss">Prazo não cumprido</option>
+                    <option value="quality">Problema de qualidade</option>
+                    <option value="process">Falha de processo</option>
+                    <option value="external">Causa externa</option>
+                    <option value="security">Incidente de segurança</option>
+                    <option value="other">Outro</option>
                   </select>
                 </div>
                 <div>

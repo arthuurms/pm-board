@@ -38,6 +38,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   ops_down: "Operação fora do ar",
   service_failure: "Falha de atendimento",
   revenue_loss: "Perda de venda/dado",
+  communication: "Falha de comunicação",
+  deadline_miss: "Prazo não cumprido",
+  quality: "Problema de qualidade",
+  process: "Falha de processo",
+  external: "Causa externa",
+  security: "Incidente de segurança",
+  other: "Outro",
 };
 
 const SEVERITY_LABELS: Record<string, string> = {

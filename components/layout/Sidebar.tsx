@@ -15,20 +15,22 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/tasks", label: "Tarefas", icon: ListTodo },
-  { href: "/completed", label: "Concluídas", icon: CheckCircle2 },
-  { href: "/rework", label: "Concluídas — Retrabalho", icon: RotateCcw },
-  { href: "/incidents", label: "Incidentes", icon: AlertTriangle },
-  { href: "/performance", label: "Análise de Desempenho", icon: BarChart2 },
-  { href: "/users", label: "Usuários & Permissões", icon: Users },
+const NAV_ALL = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
+  { href: "/tasks", label: "Tarefas", icon: ListTodo, adminOnly: false },
+  { href: "/completed", label: "Concluídas", icon: CheckCircle2, adminOnly: false },
+  { href: "/rework", label: "Concluídas — Retrabalho", icon: RotateCcw, adminOnly: false },
+  { href: "/incidents", label: "Incidentes", icon: AlertTriangle, adminOnly: false },
+  { href: "/performance", label: "Análise de Desempenho", icon: BarChart2, adminOnly: false },
+  { href: "/users", label: "Usuários & Permissões", icon: Users, adminOnly: true },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
+  const isAdmin = user?.role === "admin";
+  const NAV = NAV_ALL.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <aside className="w-64 min-h-screen bg-[#1a1d23] text-white flex flex-col shrink-0">

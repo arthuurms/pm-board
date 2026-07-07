@@ -104,7 +104,7 @@ export default function PerformancePage() {
 
       {/* Controls */}
       <div className="flex flex-wrap gap-3 mb-6">
-        {(isAdmin || users.length > 0) && (
+        {isAdmin && (
           <div>
             <label className="block text-xs text-gray-500 mb-1">Colaborador</label>
             <select
