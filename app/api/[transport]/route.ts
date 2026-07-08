@@ -83,6 +83,48 @@ const mcpHandler = createMcpHandler(
     );
 
     server.registerTool(
+      "listar_tarefas",
+      {
+        title: "Listar tarefas",
+        description: "Lista tarefas cadastradas no Clickfy, opcionalmente filtrando por responsável, para consultar títulos/descrições exatos antes de criar ou duplicar uma tarefa.",
+        inputSchema: {
+          responsavel: z.string().optional().describe("Nome da pessoa responsável, para filtrar (opcional)"),
+        },
+      },
+      async ({ responsavel }) => {
+        let assigneeId: string | undefined;
+        if (responsavel) {
+          const assignee = await resolveUser(responsavel);
+          if (!assignee) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Não encontrei ninguém chamado "${responsavel}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }],
+            };
+          }
+          assigneeId = assignee.id;
+        }
+
+        const tasks = await prisma.task.findMany({
+          where: assigneeId ? { assigneeId } : {},
+          include: { assignee: { select: { name: true } }, creator: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 30,
+        });
+
+        if (tasks.length === 0) {
+          return { content: [{ type: "text", text: "Nenhuma tarefa encontrada." }] };
+        }
+
+        const lines = tasks.map((t) => {
+          const dueDateLabel = t.dueDate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+          return `- "${t.title}"${t.description ? ` — ${t.description}` : ""} | responsável: ${t.assignee.name} | solicitado por: ${t.creator.name} | prazo: ${dueDateLabel} | status: ${t.status}`;
+        });
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+    );
+
+    server.registerTool(
       "listar_pessoas",
       {
         title: "Listar pessoas",
