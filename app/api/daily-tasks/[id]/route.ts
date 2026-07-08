@@ -22,6 +22,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const { date } = await req.json(); // "YYYY-MM-DD"
 
+  const dailyTask = await prisma.dailyTask.findUnique({ where: { id } });
+  if (!dailyTask) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (dailyTask.assigneeId !== userId) {
+    return NextResponse.json({ error: "Apenas o responsável pode marcar esta tarefa" }, { status: 403 });
+  }
+
   const existing = await prisma.dailyTaskCompletion.findUnique({
     where: { dailyTaskId_date: { dailyTaskId: id, date } },
   });

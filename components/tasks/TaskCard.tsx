@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Task } from "@/types";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2, ThumbsUp } from "lucide-react";
+import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2, ThumbsUp, Paperclip } from "lucide-react";
 import clsx from "clsx";
 
 interface Props {
@@ -111,6 +111,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           <GripVertical className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />
           <div className="flex-1 flex items-start justify-between gap-2">
             <p className="text-sm font-medium text-gray-900 leading-snug flex-1">{task.title}</p>
+            {task.attachmentUrl && <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />}
             {task.isRework && (
               <span className="shrink-0 inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">
                 <RotateCcw className="w-3 h-3" />
@@ -194,7 +195,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           {canApprove && onApprove && (
             <button
               onClick={() => onApprove(task.id)}
-              className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors font-medium"
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
               title="Confirmar que a tarefa foi entregue corretamente"
             >
               <ThumbsUp className="w-3 h-3" /> Tarefa Correta

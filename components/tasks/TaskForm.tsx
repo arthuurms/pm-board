@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { User, Task, Priority } from "@/types";
-import { X, Zap } from "lucide-react";
+import { X, Zap, Paperclip, Loader2 } from "lucide-react";
 
 interface Props {
   users: User[];
@@ -44,9 +44,30 @@ export default function TaskForm({ users, onCreated, onClose, editTask }: Props)
     priority: editTask?.priority ?? "medium",
     dueDate: editTask?.dueDate ? toLocalInput(new Date(editTask.dueDate)) : "",
     assigneeId: editTask?.assigneeId ?? users[0]?.id ?? "",
+    attachmentUrl: editTask?.attachmentUrl ?? "",
+    attachmentName: editTask?.attachmentName ?? "",
   });
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    setUploading(false);
+    if (!res.ok) {
+      setError((await res.json()).error || "Erro ao enviar arquivo");
+      return;
+    }
+    const { url, name } = await res.json();
+    setForm((f) => ({ ...f, attachmentUrl: url, attachmentName: name }));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -106,6 +127,29 @@ export default function TaskForm({ users, onCreated, onClose, editTask }: Props)
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
+            <div className="mt-2">
+              {form.attachmentUrl ? (
+                <div className="flex items-center gap-2 text-xs bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
+                  <Paperclip className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                  <a href={form.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-violet-700 hover:underline">
+                    {form.attachmentName}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, attachmentUrl: "", attachmentName: "" })}
+                    className="text-gray-400 hover:text-red-500 shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 text-xs text-gray-500 border border-dashed rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition-colors w-fit">
+                  {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+                  {uploading ? "Enviando..." : "Anexar arquivo (máx. 4MB)"}
+                  <input type="file" className="hidden" onChange={handleFileChange} disabled={uploading} />
+                </label>
+              )}
+            </div>
           </div>
 
           {/* Priority chips */}
@@ -177,7 +221,7 @@ export default function TaskForm({ users, onCreated, onClose, editTask }: Props)
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || uploading}
               className="px-4 py-2 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
             >
               {loading ? (isEdit ? "Salvando..." : "Criando...") : (isEdit ? "Salvar" : "Criar Tarefa")}

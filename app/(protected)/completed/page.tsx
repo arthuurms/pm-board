@@ -31,8 +31,8 @@ export default function CompletedPage() {
     if (!currentUser?.id) return;
     setLoading(true);
     const params = new URLSearchParams({ status: "completed" });
-    // Collaborators see only their own; admins can filter by person
-    if (!isAdmin) params.set("assigneeId", currentUser.id!);
+    // Collaborators see tasks they're involved in (as assignee or creator); admins can filter by person
+    if (!isAdmin) params.set("involvingUserId", currentUser.id!);
     else if (filterUser) params.set("assigneeId", filterUser);
     if (filterMonth) params.set("month", filterMonth);
     const res = await fetch(`/api/tasks?${params}`);

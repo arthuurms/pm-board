@@ -37,6 +37,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.assigneeId !== undefined && { assigneeId: body.assigneeId }),
       ...(body.isRework !== undefined && { isRework: body.isRework }),
       ...(body.originalTaskId !== undefined && { originalTaskId: body.originalTaskId }),
+      ...(body.attachmentUrl !== undefined && { attachmentUrl: body.attachmentUrl }),
+      ...(body.attachmentName !== undefined && { attachmentName: body.attachmentName }),
     },
     include: INCLUDE,
   });

@@ -1,7 +1,7 @@
 "use client";
 import { Task } from "@/types";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { X, Calendar, User2, Clock, CheckCircle, XCircle, RotateCcw, ThumbsUp } from "lucide-react";
+import { X, Calendar, User2, Clock, CheckCircle, XCircle, RotateCcw, ThumbsUp, Paperclip } from "lucide-react";
 import clsx from "clsx";
 
 interface Props {
@@ -33,6 +33,16 @@ export default function TaskDetail({ task, onClose }: Props) {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{task.title}</h3>
             {task.description && <p className="text-sm text-gray-500 mt-1">{task.description}</p>}
+            {task.attachmentUrl && (
+              <a
+                href={task.attachmentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-violet-600 hover:underline mt-2"
+              >
+                <Paperclip className="w-3.5 h-3.5" /> {task.attachmentName || "Arquivo anexado"}
+              </a>
+            )}
           </div>
 
           <div className="flex gap-2 flex-wrap">
