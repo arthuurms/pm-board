@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
-import { notifyTaskCompleted } from "@/lib/discord";
+import { notifyTaskCompleted, notifyTaskApproved } from "@/lib/discord";
 
 /**
  * PATCH /api/tasks/[id]/status
@@ -46,6 +46,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const now = new Date();
   const updateData: Record<string, unknown> = {};
   let justCompleted = false;
+  let justApproved = false;
 
   if (status && status !== task.status) {
     updateData.status = status;
@@ -117,6 +118,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     updateData.approved = true;
     updateData.approvedAt = now;
+    justApproved = true;
   }
 
   if (body.removeRework === true) {
@@ -144,7 +146,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   });
 
   if (justCompleted) {
-    await notifyTaskCompleted({
+    const messageId = await notifyTaskCompleted({
+      title: updated.title,
+      description: updated.description,
+      priority: updated.priority,
+      assigneeName: updated.assignee.name,
+      creatorName: updated.creator.name,
+      dueDate: updated.dueDate,
+      completedAt: updated.completedAt!,
+      onTime: updated.onTime,
+      isRework: updated.isRework,
+      reworkCount: updated.reworkCount,
+    });
+    if (messageId) {
+      await prisma.task.update({ where: { id }, data: { discordMessageId: messageId } });
+    }
+  }
+
+  if (justApproved && updated.discordMessageId) {
+    await notifyTaskApproved(updated.discordMessageId, {
       title: updated.title,
       description: updated.description,
       priority: updated.priority,

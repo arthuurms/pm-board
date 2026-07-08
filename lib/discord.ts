@@ -1,4 +1,4 @@
-type TaskCompletedNotification = {
+type TaskEmbedData = {
   title: string;
   description: string | null;
   priority: string;
@@ -53,10 +53,7 @@ function formatDateTime(date: Date): string {
   }).format(date);
 }
 
-export async function notifyTaskCompleted(task: TaskCompletedNotification): Promise<void> {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  if (!webhookUrl) return;
-
+function buildEmbed(task: TaskEmbedData, analysis: "pending" | "approved") {
   const onTime = task.onTime ?? task.completedAt <= task.dueDate;
 
   const fields = [
@@ -66,6 +63,11 @@ export async function notifyTaskCompleted(task: TaskCompletedNotification): Prom
     { name: "Prazo", value: formatDateTime(task.dueDate), inline: true },
     { name: "Concluída em", value: formatDateTime(task.completedAt), inline: true },
     { name: "No prazo?", value: onTime ? "✅ Sim" : "⚠️ Não, atrasada", inline: true },
+    {
+      name: "Análise",
+      value: analysis === "approved" ? "✅ Tarefa correta" : "🔍 Em análise",
+      inline: true,
+    },
   ];
 
   if (task.isRework) {
@@ -76,29 +78,64 @@ export async function notifyTaskCompleted(task: TaskCompletedNotification): Prom
     });
   }
 
-  const embed = {
+  return {
     title: `✅ Tarefa concluída: ${task.title}`,
     description: task.description || "_Sem descrição_",
-    color: onTime ? 0x22c55e : 0xef4444,
+    color: analysis === "approved" ? 0x22c55e : onTime ? 0x3b82f6 : 0xef4444,
     fields,
-    footer: { text: "Acesse o aplicativo para revisar e marcar se está correta ou se precisa de retrabalho." },
+    footer: {
+      text: analysis === "approved"
+        ? "Aprovada pelo solicitante."
+        : "Acesse o aplicativo para revisar e marcar se está correta ou se precisa de retrabalho.",
+    },
     timestamp: task.completedAt.toISOString(),
   };
+}
 
-  // Mentions only ping when placed in `content` — mentions inside embeds render but don't notify.
+// Posts the completion notification and returns the Discord message ID (for later editing), or null on failure.
+export async function notifyTaskCompleted(task: TaskEmbedData): Promise<string | null> {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return null;
+
+  const embed = buildEmbed(task, "pending");
   const creatorMention = mentionOrName(task.creatorName);
   const content = `${creatorMention} sua tarefa foi concluída!`;
 
   try {
-    const res = await fetch(webhookUrl, {
+    const res = await fetch(`${webhookUrl}?wait=true`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content, embeds: [embed] }),
     });
     if (!res.ok) {
       console.error("Discord webhook failed:", res.status, await res.text());
+      return null;
     }
+    const message = await res.json();
+    return message.id ?? null;
   } catch (err) {
     console.error("Discord webhook error:", err);
+    return null;
+  }
+}
+
+// Edits a previously sent completion message to mark it as approved ("Tarefa correta").
+export async function notifyTaskApproved(messageId: string, task: TaskEmbedData): Promise<void> {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const embed = buildEmbed(task, "approved");
+
+  try {
+    const res = await fetch(`${webhookUrl}/messages/${messageId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ embeds: [embed] }),
+    });
+    if (!res.ok) {
+      console.error("Discord message edit failed:", res.status, await res.text());
+    }
+  } catch (err) {
+    console.error("Discord message edit error:", err);
   }
 }

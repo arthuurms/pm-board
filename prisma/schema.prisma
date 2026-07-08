@@ -37,6 +37,7 @@ model Task {
   onTime      Boolean?  // calculated on completion
   approved    Boolean   @default(false) // creator confirmed the completed task is correct
   approvedAt  DateTime?
+  discordMessageId String? // Discord message posted on completion, edited when approved
 
   dueDate     DateTime
   startedAt   DateTime?
