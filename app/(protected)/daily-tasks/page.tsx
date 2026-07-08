@@ -36,6 +36,7 @@ export default function DailyTasksPage() {
 
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filterUser, setFilterUser] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -44,17 +45,19 @@ export default function DailyTasksPage() {
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    fetch("/api/users").then((r) => r.json()).then((list) => {
+    fetch("/api/users").then((r) => r.json()).then((list: User[]) => {
       setUsers(list);
-      if (!isAdmin && currentUser?.id) setForm((f) => ({ ...f, assigneeId: currentUser.id! }));
-      else if (list.length > 0) setForm((f) => ({ ...f, assigneeId: list[0].id }));
+      setUsersLoaded(true);
+      const defaultId = !isAdmin && currentUser?.id ? currentUser.id : list[0]?.id ?? "";
+      setForm((f) => ({ ...f, assigneeId: defaultId }));
     });
   }, [isAdmin, currentUser?.id]);
 
   const load = useCallback(async () => {
+    if (!currentUser?.id) return;
     setLoading(true);
     const params = new URLSearchParams();
-    if (!isAdmin) params.set("assigneeId", currentUser?.id || "");
+    if (!isAdmin) params.set("assigneeId", currentUser.id);
     else if (filterUser) params.set("assigneeId", filterUser);
     const res = await fetch(`/api/daily-tasks?${params}`);
     setTasks(await res.json());
@@ -79,6 +82,7 @@ export default function DailyTasksPage() {
 
   async function submitForm(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.assigneeId) { setFormError("Selecione um responsável"); return; }
     setSubmitting(true);
     setFormError("");
     const res = await fetch("/api/daily-tasks", {
@@ -89,12 +93,13 @@ export default function DailyTasksPage() {
     setSubmitting(false);
     if (!res.ok) { setFormError((await res.json()).error); return; }
     setShowForm(false);
-    setForm({ title: "", description: "", priority: "medium", assigneeId: users[0]?.id || "" });
+    setForm({ title: "", description: "", priority: "medium", assigneeId: users[0]?.id ?? "" });
     load();
   }
 
   const completedToday = tasks.filter((t) => t.completions.some((c) => c.date === today)).length;
   const total = tasks.length;
+  const allDone = total > 0 && completedToday === total;
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -114,20 +119,22 @@ export default function DailyTasksPage() {
         </button>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress */}
       {total > 0 && (
-        <div className="mb-5 bg-white rounded-xl border p-4 shadow-sm">
+        <div className={clsx("mb-5 rounded-xl border p-4 shadow-sm", allDone ? "bg-green-50 border-green-200" : "bg-white")}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Progresso de hoje</span>
-            <span className="text-sm font-bold text-violet-700">{completedToday}/{total}</span>
+            <span className={clsx("text-sm font-bold", allDone ? "text-green-600" : "text-violet-700")}>
+              {completedToday}/{total}
+            </span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2.5">
             <div
-              className="bg-violet-500 h-2.5 rounded-full transition-all"
-              style={{ width: total > 0 ? `${(completedToday / total) * 100}%` : "0%" }}
+              className={clsx("h-2.5 rounded-full transition-all", allDone ? "bg-green-500" : "bg-violet-500")}
+              style={{ width: `${(completedToday / total) * 100}%` }}
             />
           </div>
-          {completedToday === total && total > 0 && (
+          {allDone && (
             <p className="text-xs text-green-600 font-medium mt-2 flex items-center gap-1">
               <Check className="w-3.5 h-3.5" /> Todas as tarefas concluídas hoje!
             </p>
@@ -135,7 +142,6 @@ export default function DailyTasksPage() {
         </div>
       )}
 
-      {/* Filter */}
       {isAdmin && (
         <div className="mb-4">
           <select
@@ -171,14 +177,11 @@ export default function DailyTasksPage() {
                   doneToday && "border-green-200 bg-green-50"
                 )}
               >
-                {/* Checkbox */}
                 <button
                   onClick={() => toggleComplete(task.id)}
                   className={clsx(
                     "mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
-                    doneToday
-                      ? "bg-green-500 border-green-500 text-white"
-                      : "border-gray-300 hover:border-violet-400"
+                    doneToday ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-violet-400"
                   )}
                 >
                   {doneToday && <Check className="w-3.5 h-3.5" />}
@@ -188,9 +191,7 @@ export default function DailyTasksPage() {
                   <p className={clsx("font-medium text-gray-900", doneToday && "line-through text-gray-400")}>
                     {task.title}
                   </p>
-                  {task.description && (
-                    <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>
-                  )}
+                  {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <PriorityBadge priority={task.priority} />
                     <span className="text-xs text-gray-400">→ {task.assignee.name}</span>
@@ -215,7 +216,6 @@ export default function DailyTasksPage() {
         </div>
       )}
 
-      {/* Form modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
@@ -264,7 +264,9 @@ export default function DailyTasksPage() {
                     value={form.assigneeId}
                     onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
                     required
+                    disabled={!usersLoaded}
                   >
+                    {!usersLoaded && <option value="">Carregando...</option>}
                     {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
@@ -272,7 +274,7 @@ export default function DailyTasksPage() {
               {formError && <p className="text-sm text-red-600">{formError}</p>}
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">Cancelar</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50">
+                <button type="submit" disabled={submitting || !usersLoaded} className="px-4 py-2 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50">
                   {submitting ? "Criando..." : "Criar"}
                 </button>
               </div>
