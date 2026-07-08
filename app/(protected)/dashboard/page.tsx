@@ -80,12 +80,14 @@ export default function DashboardPage() {
   const loadDaily = useCallback(async () => {
     if (!currentUser?.id) return;
     setDailyLoading(true);
-    const params = new URLSearchParams();
-    if (!isAdmin) params.set("assigneeId", currentUser.id);
+    // This widget is a personal daily routine checklist — always scoped to the
+    // logged-in user, even for admins (the dedicated /daily-tasks page has the
+    // admin-wide grouped view).
+    const params = new URLSearchParams({ assigneeId: currentUser.id });
     const res = await fetch(`/api/daily-tasks?${params}`);
     setDailyTasks(await res.json());
     setDailyLoading(false);
-  }, [isAdmin, currentUser?.id]);
+  }, [currentUser?.id]);
 
   useEffect(() => { loadDaily(); }, [loadDaily]);
 
