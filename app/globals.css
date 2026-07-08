@@ -1,11 +1,67 @@
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #f9fafb;
   --foreground: #111827;
 }
 
+.dark {
+  --background: #0f1117;
+  --foreground: #f1f5f9;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Dark mode overrides for white cards/panels */
+.dark .bg-white {
+  background-color: #1e2130 !important;
+  color: #f1f5f9;
+}
+.dark .bg-gray-50 {
+  background-color: #161924 !important;
+}
+.dark .bg-gray-100 {
+  background-color: #1a1e2e !important;
+}
+.dark .border {
+  border-color: #2e3350 !important;
+}
+.dark .border-b {
+  border-color: #2e3350 !important;
+}
+.dark .border-t {
+  border-color: #2e3350 !important;
+}
+.dark .text-gray-900 {
+  color: #f1f5f9 !important;
+}
+.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+.dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+.dark .text-gray-500 {
+  color: #64748b !important;
+}
+.dark .text-gray-400 {
+  color: #475569 !important;
+}
+.dark input, .dark textarea, .dark select {
+  background-color: #1e2130 !important;
+  color: #f1f5f9 !important;
+  border-color: #2e3350 !important;
+}
+.dark input::placeholder, .dark textarea::placeholder {
+  color: #475569 !important;
+}
+.dark .shadow-sm {
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.4) !important;
+}
+.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.6) !important;
 }

@@ -91,10 +91,15 @@ export default function UsersPage() {
     }
     setEditSubmitting(true);
     setEditError("");
+    const payload: Record<string, string> = {};
+    if (editData.name) payload.name = editData.name;
+    if (editData.email) payload.email = editData.email;
+    if (editData.password) payload.password = editData.password;
+
     const res = await fetch(`/api/users/${editUser.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editData),
+      body: JSON.stringify(payload),
     });
     setEditSubmitting(false);
     if (!res.ok) { setEditError((await res.json()).error); return; }

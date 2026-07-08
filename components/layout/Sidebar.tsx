@@ -14,7 +14,10 @@ import {
   LogOut,
   ChevronRight,
   CalendarCheck,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/lib/theme";
 
 const NAV_ALL = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
@@ -33,6 +36,7 @@ export default function Sidebar() {
   const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
   const isAdmin = user?.role === "admin";
   const NAV = NAV_ALL.filter((item) => !item.adminOnly || isAdmin);
+  const { theme, toggle } = useTheme();
 
   return (
     <aside className="w-64 min-h-screen bg-[#1a1d23] text-white flex flex-col shrink-0">
@@ -78,6 +82,16 @@ export default function Sidebar() {
             <p className="text-sm font-medium truncate">{user?.name}</p>
             <p className="text-xs text-slate-400 truncate">{user?.role === "admin" ? "Admin / PM" : "Colaborador"}</p>
           </div>
+        </div>
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={toggle}
+            className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
+            title={theme === "dark" ? "Modo claro" : "Modo noturno"}
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {theme === "dark" ? "Modo claro" : "Modo noturno"}
+          </button>
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
