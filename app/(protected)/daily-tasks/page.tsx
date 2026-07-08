@@ -28,6 +28,57 @@ const PRIORITY_OPTIONS = [
   { value: "urgent", label: "Urgente" },
 ];
 
+function DailyTaskRow({ task, today, onToggle, onDelete }: {
+  task: DailyTask;
+  today: string;
+  onToggle: (taskId: string) => void;
+  onDelete: (taskId: string) => void;
+}) {
+  const doneToday = task.completions.some((c) => c.date === today);
+  return (
+    <div
+      className={clsx(
+        "bg-white rounded-xl border p-4 shadow-sm flex items-start gap-3 transition-all",
+        doneToday && "border-green-200 bg-green-50"
+      )}
+    >
+      <button
+        onClick={() => onToggle(task.id)}
+        className={clsx(
+          "mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
+          doneToday ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-violet-400"
+        )}
+      >
+        {doneToday && <Check className="w-3.5 h-3.5" />}
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <p className={clsx("font-medium text-gray-900", doneToday && "line-through text-gray-400")}>
+          {task.title}
+        </p>
+        {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <PriorityBadge priority={task.priority} />
+          <span className="text-xs text-gray-400">→ {task.assignee.name}</span>
+          {doneToday && (
+            <span className="text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
+              Feito hoje ✓
+            </span>
+          )}
+        </div>
+      </div>
+
+      <button
+        onClick={() => onDelete(task.id)}
+        className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors shrink-0"
+        title="Remover tarefa diária"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
 export default function DailyTasksPage() {
   const { data: session } = useSession();
   const currentUser = session?.user as { id?: string; role?: string; name?: string } | undefined;
@@ -101,6 +152,20 @@ export default function DailyTasksPage() {
   const total = tasks.length;
   const allDone = total > 0 && completedToday === total;
 
+  // Admins viewing "all" see each person's daily tasks grouped separately,
+  // instead of one flat list that reads as a single shared task list.
+  const groupedView = isAdmin && !filterUser;
+  const groups = groupedView
+    ? Array.from(
+        tasks.reduce((map, t) => {
+          const key = t.assignee.id;
+          if (!map.has(key)) map.set(key, { name: t.assignee.name, tasks: [] as DailyTask[] });
+          map.get(key)!.tasks.push(t);
+          return map;
+        }, new Map<string, { name: string; tasks: DailyTask[] }>())
+      ).map(([assigneeId, group]) => ({ assigneeId, ...group }))
+    : [];
+
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -119,8 +184,8 @@ export default function DailyTasksPage() {
         </button>
       </div>
 
-      {/* Progress */}
-      {total > 0 && (
+      {/* Progress — only meaningful for a single person's routine, not the admin's combined "all" view */}
+      {!groupedView && total > 0 && (
         <div className={clsx("mb-5 rounded-xl border p-4 shadow-sm", allDone ? "bg-green-50 border-green-200" : "bg-white")}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Progresso de hoje</span>
@@ -165,54 +230,36 @@ export default function DailyTasksPage() {
         </div>
       )}
 
-      {!loading && (
-        <div className="space-y-3">
-          {tasks.map((task) => {
-            const doneToday = task.completions.some((c) => c.date === today);
+      {!loading && groupedView && groups.length > 0 && (
+        <div className="space-y-6">
+          {groups.map((group) => {
+            const groupDone = group.tasks.filter((t) => t.completions.some((c) => c.date === today)).length;
             return (
-              <div
-                key={task.id}
-                className={clsx(
-                  "bg-white rounded-xl border p-4 shadow-sm flex items-start gap-3 transition-all",
-                  doneToday && "border-green-200 bg-green-50"
-                )}
-              >
-                <button
-                  onClick={() => toggleComplete(task.id)}
-                  className={clsx(
-                    "mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all",
-                    doneToday ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-violet-400"
-                  )}
-                >
-                  {doneToday && <Check className="w-3.5 h-3.5" />}
-                </button>
-
-                <div className="flex-1 min-w-0">
-                  <p className={clsx("font-medium text-gray-900", doneToday && "line-through text-gray-400")}>
-                    {task.title}
+              <div key={group.assigneeId}>
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Tarefas diárias — {group.name}
                   </p>
-                  {task.description && <p className="text-xs text-gray-500 mt-0.5">{task.description}</p>}
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <PriorityBadge priority={task.priority} />
-                    <span className="text-xs text-gray-400">→ {task.assignee.name}</span>
-                    {doneToday && (
-                      <span className="text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">
-                        Feito hoje ✓
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {groupDone}/{group.tasks.length}
+                  </span>
                 </div>
-
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors shrink-0"
-                  title="Remover tarefa diária"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="space-y-3">
+                  {group.tasks.map((task) => (
+                    <DailyTaskRow key={task.id} task={task} today={today} onToggle={toggleComplete} onDelete={deleteTask} />
+                  ))}
+                </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!loading && !groupedView && (
+        <div className="space-y-3">
+          {tasks.map((task) => (
+            <DailyTaskRow key={task.id} task={task} today={today} onToggle={toggleComplete} onDelete={deleteTask} />
+          ))}
         </div>
       )}
 
