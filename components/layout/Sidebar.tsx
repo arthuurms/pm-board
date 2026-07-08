@@ -19,9 +19,9 @@ import {
 const NAV_ALL = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
   { href: "/tasks", label: "Tarefas", icon: ListTodo, adminOnly: false },
+  { href: "/daily-tasks", label: "Tarefas Diárias", icon: CalendarCheck, adminOnly: false },
   { href: "/completed", label: "Concluídas", icon: CheckCircle2, adminOnly: false },
   { href: "/rework", label: "Concluídas — Retrabalho", icon: RotateCcw, adminOnly: false },
-  { href: "/daily-tasks", label: "Tarefas Diárias", icon: CalendarCheck, adminOnly: false },
   { href: "/incidents", label: "Incidentes", icon: AlertTriangle, adminOnly: false },
   { href: "/performance", label: "Análise de Desempenho", icon: BarChart2, adminOnly: false },
   { href: "/users", label: "Usuários & Permissões", icon: Users, adminOnly: true },
