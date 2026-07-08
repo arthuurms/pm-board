@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { User, Task } from "@/types";
+import { User, Task, Priority } from "@/types";
 import { X, Zap } from "lucide-react";
 
 interface Props {
@@ -28,7 +28,7 @@ const SHORTCUTS = [
   { label: "Semana que vem", getValue: () => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(18, 0, 0, 0); return toLocalInput(d); } },
 ];
 
-const PRIORITY_OPTIONS = [
+const PRIORITY_OPTIONS: { value: Priority; label: string; color: string }[] = [
   { value: "low", label: "Baixa", color: "bg-slate-100 text-slate-600 border-slate-200" },
   { value: "medium", label: "Média", color: "bg-blue-100 text-blue-700 border-blue-200" },
   { value: "high", label: "Alta", color: "bg-orange-100 text-orange-700 border-orange-200" },
