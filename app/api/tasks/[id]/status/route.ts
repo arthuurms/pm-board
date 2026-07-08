@@ -65,6 +65,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // Reopening: clear completion data
       updateData.completedAt = null;
       updateData.onTime = null;
+      updateData.approved = false;
+      updateData.approvedAt = null;
     }
 
     await prisma.statusHistory.create({
@@ -89,6 +91,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     updateData.status = "pending";
     updateData.completedAt = null;
     updateData.onTime = null;
+    updateData.approved = false;
+    updateData.approvedAt = null;
     await prisma.statusHistory.create({
       data: {
         taskId: id,
@@ -99,6 +103,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         note: "Retrabalho registrado",
       },
     });
+  }
+
+  if (body.approve === true) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const isCreator = task.creatorId === userId;
+    const isAdmin = user?.role === "admin";
+    if (!isCreator && !isAdmin) {
+      return NextResponse.json({ error: "Apenas quem solicitou a tarefa pode aprová-la" }, { status: 403 });
+    }
+    if (task.status !== "completed") {
+      return NextResponse.json({ error: "Só é possível aprovar tarefas concluídas" }, { status: 400 });
+    }
+    updateData.approved = true;
+    updateData.approvedAt = now;
   }
 
   if (body.removeRework === true) {

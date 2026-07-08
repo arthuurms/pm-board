@@ -9,6 +9,8 @@ interface Props {
   onStatusChange: (taskId: string, newStatus: string) => void;
   onMarkRework: (taskId: string) => void;
   onRemoveRework: (taskId: string) => void;
+  onApprove?: (taskId: string) => void;
+  currentUserId?: string;
   onTaskClick: (task: Task) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
@@ -27,7 +29,7 @@ const ALLOWED: Record<string, Record<string, string>> = {
   completed:   { pending: "pending", in_progress: "in_progress" },
 };
 
-export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRework, onRemoveRework, onTaskClick, onEdit, onDelete }: Props) {
+export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRework, onRemoveRework, onApprove, currentUserId, onTaskClick, onEdit, onDelete }: Props) {
   function handleDragEnd(result: DropResult) {
     const { source, destination, draggableId } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
@@ -88,6 +90,8 @@ export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRe
                               onStatusChange={onStatusChange}
                               onMarkRework={onMarkRework}
                               onRemoveRework={onRemoveRework}
+                              onApprove={onApprove}
+                              currentUserId={currentUserId}
                               onEdit={onEdit}
                               onDelete={onDelete}
                               onClick={() => onTaskClick(task)}

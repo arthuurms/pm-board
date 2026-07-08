@@ -66,6 +66,14 @@ export default function CompletedPage() {
     load();
   }
 
+  async function approveTask(taskId: string) {
+    await fetch(`/api/tasks/${taskId}/status`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approve: true }),
+    });
+    load();
+  }
+
   // Split into normal vs rework for visual grouping
   const normal = tasks.filter(t => !t.isRework);
   const rework = tasks.filter(t => t.isRework);
@@ -118,6 +126,7 @@ export default function CompletedPage() {
                 {normal.map(t => (
                   <TaskCard key={t.id} task={t} permissions={permissions}
                     onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework}
+                    onApprove={approveTask} currentUserId={currentUser?.id}
                     onClick={() => setSelected(t)} />
                 ))}
               </div>
@@ -137,6 +146,7 @@ export default function CompletedPage() {
                 {rework.map(t => (
                   <TaskCard key={t.id} task={t} permissions={permissions}
                     onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework}
+                    onApprove={approveTask} currentUserId={currentUser?.id}
                     onClick={() => setSelected(t)} />
                 ))}
               </div>

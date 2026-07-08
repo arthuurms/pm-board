@@ -59,7 +59,11 @@ export default function TaskForm({ users, onCreated, onClose, editTask }: Props)
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      // dueDate comes from a datetime-local input (no timezone info) — convert it
+      // using the browser's local timezone before sending, since the server may
+      // run in a different timezone (e.g. UTC on Vercel) and would otherwise
+      // misinterpret the same clock time as a different instant.
+      body: JSON.stringify({ ...form, dueDate: new Date(form.dueDate).toISOString() }),
     });
     setLoading(false);
     if (!res.ok) {

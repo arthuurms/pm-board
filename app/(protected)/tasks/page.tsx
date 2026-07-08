@@ -98,6 +98,15 @@ export default function TasksPage() {
     load();
   }
 
+  async function approveTask(taskId: string) {
+    await fetch(`/api/tasks/${taskId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approve: true }),
+    });
+    load();
+  }
+
   async function deleteTask(taskId: string) {
     await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
     load();
@@ -239,6 +248,8 @@ export default function TasksPage() {
           onStatusChange={changeStatus}
           onMarkRework={markRework}
           onRemoveRework={removeRework}
+          onApprove={approveTask}
+          currentUserId={currentUser?.id}
           onTaskClick={setSelectedTask}
           onEdit={setEditTask}
           onDelete={isAdmin ? deleteTask : undefined}
@@ -256,6 +267,8 @@ export default function TasksPage() {
               onStatusChange={changeStatus}
               onMarkRework={markRework}
               onRemoveRework={removeRework}
+              onApprove={approveTask}
+              currentUserId={currentUser?.id}
               onEdit={setEditTask}
               onDelete={isAdmin ? deleteTask : undefined}
               onClick={() => setSelectedTask(t)}

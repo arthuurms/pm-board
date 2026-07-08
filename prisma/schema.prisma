@@ -35,6 +35,8 @@ model Task {
   isRework    Boolean   @default(false)
   reworkCount Int       @default(0) // increments each time task is marked as rework
   onTime      Boolean?  // calculated on completion
+  approved    Boolean   @default(false) // creator confirmed the completed task is correct
+  approvedAt  DateTime?
 
   dueDate     DateTime
   startedAt   DateTime?

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Task } from "@/types";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2 } from "lucide-react";
+import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2, ThumbsUp } from "lucide-react";
 import clsx from "clsx";
 
 interface Props {
@@ -11,6 +11,8 @@ interface Props {
   onStatusChange: (taskId: string, newStatus: string) => void;
   onMarkRework: (taskId: string) => void;
   onRemoveRework: (taskId: string) => void;
+  onApprove?: (taskId: string) => void;
+  currentUserId?: string;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
   onClick: () => void;
@@ -79,8 +81,9 @@ function ConfirmRework({ taskTitle, onConfirm, onCancel }: {
   );
 }
 
-export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onEdit, onDelete, onClick }: Props) {
+export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onApprove, currentUserId, onEdit, onDelete, onClick }: Props) {
   const overdue = isOverdue(task);
+  const canApprove = task.status === "completed" && !task.approved && currentUserId === task.creatorId;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -144,7 +147,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
         </div>
 
         {task.status === "completed" && task.completedAt && (
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             {task.onTime ? (
               <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">
                 <CheckCircle className="w-3 h-3" /> Concluída {fmtDateTime(task.completedAt)}
@@ -152,6 +155,11 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
             ) : (
               <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded">
                 <XCircle className="w-3 h-3" /> Concluída {fmtDateTime(task.completedAt)} · Fora do prazo
+              </span>
+            )}
+            {task.approved && (
+              <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
+                <ThumbsUp className="w-3 h-3" /> Tarefa correta
               </span>
             )}
           </div>
@@ -181,6 +189,15 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
               className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
             >
               Reabrir
+            </button>
+          )}
+          {canApprove && onApprove && (
+            <button
+              onClick={() => onApprove(task.id)}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors font-medium"
+              title="Confirmar que a tarefa foi entregue corretamente"
+            >
+              <ThumbsUp className="w-3 h-3" /> Tarefa Correta
             </button>
           )}
 

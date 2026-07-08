@@ -30,6 +30,8 @@ export interface Task {
   isRework: boolean;
   reworkCount: number;
   onTime?: boolean | null;
+  approved: boolean;
+  approvedAt?: string | null;
   dueDate: string;
   startedAt?: string | null;
   completedAt?: string | null;

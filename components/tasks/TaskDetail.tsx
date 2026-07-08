@@ -1,7 +1,7 @@
 "use client";
 import { Task } from "@/types";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { X, Calendar, User2, Clock, CheckCircle, XCircle, RotateCcw } from "lucide-react";
+import { X, Calendar, User2, Clock, CheckCircle, XCircle, RotateCcw, ThumbsUp } from "lucide-react";
 import clsx from "clsx";
 
 interface Props {
@@ -51,6 +51,17 @@ export default function TaskDetail({ task, onClose }: Props) {
               ) : (
                 <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded">
                   <XCircle className="w-3 h-3" /> Fora do prazo
+                </span>
+              )
+            )}
+            {task.status === "completed" && (
+              task.approved ? (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
+                  <ThumbsUp className="w-3 h-3" /> Tarefa correta
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                  Aguardando revisão
                 </span>
               )
             )}
