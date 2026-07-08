@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -17,11 +16,13 @@ model User {
   position  String?
   createdAt DateTime @default(now())
 
-  assignedTasks  Task[]          @relation("AssignedTasks")
-  createdTasks   Task[]          @relation("CreatedTasks")
-  statusChanges  StatusHistory[]
-  incidents      Incident[]
-  permissions    UserPermission[]
+  assignedTasks      Task[]                @relation("AssignedTasks")
+  createdTasks       Task[]                @relation("CreatedTasks")
+  statusChanges      StatusHistory[]
+  incidents          Incident[]
+  permissions        UserPermission[]
+  dailyTasks         DailyTask[]           @relation("DailyTaskAssignee")
+  createdDailyTasks  DailyTask[]           @relation("DailyTaskCreator")
 }
 
 model Task {
@@ -75,6 +76,34 @@ model Incident {
   reportedById String
   reportedBy   User     @relation(fields: [reportedById], references: [id])
   relatedUserId String?
+}
+
+// Recurring daily task template
+model DailyTask {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  priority    String   @default("medium")
+  assigneeId  String
+  assignee    User     @relation("DailyTaskAssignee", fields: [assigneeId], references: [id])
+  creatorId   String
+  creator     User     @relation("DailyTaskCreator", fields: [creatorId], references: [id])
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  completions DailyTaskCompletion[]
+}
+
+// Tracks whether a daily task was completed on a specific calendar day
+model DailyTaskCompletion {
+  id          String    @id @default(cuid())
+  dailyTaskId String
+  dailyTask   DailyTask @relation(fields: [dailyTaskId], references: [id], onDelete: Cascade)
+  date        String    // "YYYY-MM-DD"
+  completedAt DateTime  @default(now())
+  userId      String
+
+  @@unique([dailyTaskId, date])
 }
 
 // Granular per-user permissions

@@ -13,6 +13,7 @@ import {
   BarChart2,
   LogOut,
   ChevronRight,
+  CalendarCheck,
 } from "lucide-react";
 
 const NAV_ALL = [
@@ -20,6 +21,7 @@ const NAV_ALL = [
   { href: "/tasks", label: "Tarefas", icon: ListTodo, adminOnly: false },
   { href: "/completed", label: "Concluídas", icon: CheckCircle2, adminOnly: false },
   { href: "/rework", label: "Concluídas — Retrabalho", icon: RotateCcw, adminOnly: false },
+  { href: "/daily-tasks", label: "Tarefas Diárias", icon: CalendarCheck, adminOnly: false },
   { href: "/incidents", label: "Incidentes", icon: AlertTriangle, adminOnly: false },
   { href: "/performance", label: "Análise de Desempenho", icon: BarChart2, adminOnly: false },
   { href: "/users", label: "Usuários & Permissões", icon: Users, adminOnly: true },
