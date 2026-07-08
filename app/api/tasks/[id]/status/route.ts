@@ -82,6 +82,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!allowed) return NextResponse.json({ error: "Sem permissão para marcar como retrabalho" }, { status: 403 });
     updateData.isRework = true;
     updateData.reworkCount = { increment: 1 };
+    // Move task back to pending and clear completion data
+    updateData.status = "pending";
+    updateData.completedAt = null;
+    updateData.onTime = null;
+    await prisma.statusHistory.create({
+      data: {
+        taskId: id,
+        fromStatus: task.status,
+        toStatus: "pending",
+        changedById: userId,
+        changedAt: now,
+        note: "Retrabalho registrado",
+      },
+    });
   }
 
   if (body.removeRework === true) {
