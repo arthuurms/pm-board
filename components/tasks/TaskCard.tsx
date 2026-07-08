@@ -159,7 +159,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
               </span>
             )}
             {task.approved && (
-              <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
+              <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium">
                 <ThumbsUp className="w-3 h-3" /> Tarefa correta
               </span>
             )}
@@ -195,7 +195,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           {canApprove && onApprove && (
             <button
               onClick={() => onApprove(task.id)}
-              className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-50 text-green-700 hover:bg-green-100 transition-colors font-medium"
               title="Confirmar que a tarefa foi entregue corretamente"
             >
               <ThumbsUp className="w-3 h-3" /> Tarefa Correta

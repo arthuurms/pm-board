@@ -66,7 +66,7 @@ export default function TaskDetail({ task, onClose }: Props) {
             )}
             {task.status === "completed" && (
               task.approved ? (
-                <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
+                <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium">
                   <ThumbsUp className="w-3 h-3" /> Tarefa correta
                 </span>
               ) : (

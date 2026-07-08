@@ -6,7 +6,7 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Fourfy Board — Gestão de Tarefas",
+  title: "Clickfy — Gestão de Tarefas",
   description: "Gestão de tarefas com métricas de qualidade para Project Managers",
 };
 

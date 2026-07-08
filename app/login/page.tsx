@@ -37,7 +37,7 @@ export default function LoginPage() {
           <div className="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center">
             <ChevronRight className="w-6 h-6 text-white" />
           </div>
-          <span className="text-white text-2xl font-bold">Fourfy Board</span>
+          <span className="text-white text-2xl font-bold">Clickfy</span>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
