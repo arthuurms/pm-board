@@ -95,6 +95,17 @@ export default function DailyTasksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
+  // Restore the last person filter so it survives a page reload.
+  useEffect(() => {
+    const saved = localStorage.getItem("clickfy:daily-tasks:filterUser");
+    if (saved) setFilterUser(saved);
+  }, []);
+
+  useEffect(() => {
+    if (filterUser) localStorage.setItem("clickfy:daily-tasks:filterUser", filterUser);
+    else localStorage.removeItem("clickfy:daily-tasks:filterUser");
+  }, [filterUser]);
+
   useEffect(() => {
     fetch("/api/users").then((r) => r.json()).then((list: User[]) => {
       setUsers(list);

@@ -18,6 +18,17 @@ export default function CompletedPage() {
   const [filterMonth, setFilterMonth] = useState("");
   const [loading, setLoading]     = useState(true);
 
+  // Restore the last person filter so it survives a page reload.
+  useEffect(() => {
+    const saved = localStorage.getItem("clickfy:completed:filterUser");
+    if (saved) setFilterUser(saved);
+  }, []);
+
+  useEffect(() => {
+    if (filterUser) localStorage.setItem("clickfy:completed:filterUser", filterUser);
+    else localStorage.removeItem("clickfy:completed:filterUser");
+  }, [filterUser]);
+
   useEffect(() => { fetch("/api/users").then(r => r.json()).then(setUsers); }, []);
 
   useEffect(() => {

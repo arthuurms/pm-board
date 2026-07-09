@@ -40,6 +40,17 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
 
+  // Restore the last person filter so it survives a page reload.
+  useEffect(() => {
+    const saved = localStorage.getItem("clickfy:tasks:filterUser");
+    if (saved) setFilterUser(saved);
+  }, []);
+
+  useEffect(() => {
+    if (filterUser) localStorage.setItem("clickfy:tasks:filterUser", filterUser);
+    else localStorage.removeItem("clickfy:tasks:filterUser");
+  }, [filterUser]);
+
   useEffect(() => {
     fetch("/api/users").then((r) => r.json()).then(setUsers);
   }, []);
