@@ -26,19 +26,18 @@ export default function CompletedPage() {
   }, [currentUser?.id]);
 
   const isAdmin = currentUser?.role === "admin";
+  const canViewAll = isAdmin || permissions.view_all_tasks;
 
   const load = useCallback(async () => {
     if (!currentUser?.id) return;
     setLoading(true);
     const params = new URLSearchParams({ status: "completed" });
-    // Collaborators see tasks they're involved in (as assignee or creator); admins can filter by person
-    if (!isAdmin) params.set("involvingUserId", currentUser.id!);
-    else if (filterUser) params.set("assigneeId", filterUser);
+    if (canViewAll && filterUser) params.set("assigneeId", filterUser);
     if (filterMonth) params.set("month", filterMonth);
     const res = await fetch(`/api/tasks?${params}`);
     setTasks(await res.json());
     setLoading(false);
-  }, [currentUser?.id, isAdmin, filterUser, filterMonth]);
+  }, [currentUser?.id, canViewAll, filterUser, filterMonth]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -89,13 +88,15 @@ export default function CompletedPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-5">
-        {isAdmin && (
+        {canViewAll && (
           <select
             className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
             value={filterUser} onChange={e => setFilterUser(e.target.value)}
           >
             <option value="">Todos</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {(isAdmin ? users : users.filter(u => u.role !== "admin")).map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
           </select>
         )}
         <input

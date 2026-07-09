@@ -16,23 +16,35 @@ const INCLUDE = {
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = (session.user as { id: string }).id;
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
-  const assigneeId = searchParams.get("assigneeId");
-  // Tasks where the user is either the assignee or the creator (used for a
-  // user's own view, so they can see tasks they handed off to someone else).
-  const involvingUserId = searchParams.get("involvingUserId");
+  const assigneeIdParam = searchParams.get("assigneeId");
   const priority = searchParams.get("priority");
   const isRework = searchParams.get("isRework");
   const month = searchParams.get("month"); // YYYY-MM
 
+  const requester = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  const isAdmin = requester?.role === "admin";
+  const canViewAll = isAdmin || (await hasPermission(userId, "view_all_tasks"));
+
   const where: Record<string, unknown> = {};
   if (status) where.status = status;
-  if (assigneeId) where.assigneeId = assigneeId;
-  if (involvingUserId) where.OR = [{ assigneeId: involvingUserId }, { creatorId: involvingUserId }];
   if (priority) where.priority = priority;
   if (isRework !== null) where.isRework = isRework === "true";
+
+  if (!canViewAll) {
+    // Regular collaborators only ever see their own tasks — the assigneeId
+    // param is ignored so they can't request someone else's.
+    where.assigneeId = userId;
+  } else {
+    if (assigneeIdParam) where.assigneeId = assigneeIdParam;
+    if (!isAdmin) {
+      // Granted "view all" without being an admin: everyone except admins.
+      where.assignee = { role: { not: "admin" } };
+    }
+  }
 
   if (month) {
     const [y, m] = month.split("-").map(Number);

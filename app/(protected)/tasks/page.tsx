@@ -50,15 +50,14 @@ export default function TasksPage() {
   }, [currentUser?.id]);
 
   const isAdmin = currentUser?.role === "admin";
+  const canViewAll = isAdmin || permissions.view_all_tasks;
 
   const load = useCallback(async () => {
     if (!currentUser?.id) return;
     setLoading(true);
     const params = new URLSearchParams();
 
-    if (!isAdmin) {
-      params.set("involvingUserId", currentUser.id);
-    } else if (filterUser) {
+    if (canViewAll && filterUser) {
       params.set("assigneeId", filterUser);
     }
 
@@ -67,7 +66,7 @@ export default function TasksPage() {
     const res = await fetch(`/api/tasks?${params}`);
     setTasks(await res.json());
     setLoading(false);
-  }, [currentUser?.id, isAdmin, filterUser, filterPriority]);
+  }, [currentUser?.id, canViewAll, filterUser, filterPriority]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -142,7 +141,7 @@ export default function TasksPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tarefas Ativas</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {isAdmin ? "Visão geral da equipe" : `Suas tarefas, ${currentUser?.name?.split(" ")[0]}`}
+            {canViewAll ? "Visão geral da equipe" : `Suas tarefas, ${currentUser?.name?.split(" ")[0]}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -218,14 +217,16 @@ export default function TasksPage() {
       )}
 
       <div className="flex flex-wrap gap-3 mb-5">
-        {isAdmin && (
+        {canViewAll && (
           <select
             className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
             value={filterUser}
             onChange={(e) => setFilterUser(e.target.value)}
           >
             <option value="">Todos os responsáveis</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {(isAdmin ? users : users.filter((u) => u.role !== "admin")).map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
           </select>
         )}
         <select

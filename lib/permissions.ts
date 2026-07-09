@@ -6,7 +6,8 @@ export type Action =
   | "move_completed"
   | "mark_rework"
   | "create_incident"
-  | "manage_permissions";
+  | "manage_permissions"
+  | "view_all_tasks";
 
 export const ALL_ACTIONS: Action[] = [
   "create_task",
@@ -15,6 +16,7 @@ export const ALL_ACTIONS: Action[] = [
   "mark_rework",
   "create_incident",
   "manage_permissions",
+  "view_all_tasks",
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {
@@ -24,6 +26,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   mark_rework: "Marcar como retrabalho",
   create_incident: "Registrar incidente",
   manage_permissions: "Gerenciar permissões",
+  view_all_tasks: "Ver tarefas de todo mundo (exceto admins)",
 };
 
 /**
