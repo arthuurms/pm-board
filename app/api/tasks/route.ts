@@ -56,8 +56,14 @@ export async function GET(req: NextRequest) {
   const tasks = await prisma.task.findMany({
     where,
     include: INCLUDE,
-    orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
+    orderBy: { dueDate: "asc" },
   });
+
+  // Priority is a plain string field, so sorting it alphabetically ("desc")
+  // doesn't match real urgency (e.g. "high" sorts after "medium"). Rank
+  // explicitly instead: Urgente, Alta, Média, Baixa.
+  const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+  tasks.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99));
 
   return NextResponse.json(tasks);
 }
