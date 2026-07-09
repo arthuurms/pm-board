@@ -11,6 +11,7 @@ interface Props {
   onRemoveRework: (taskId: string) => void;
   onApprove?: (taskId: string) => void;
   currentUserId?: string;
+  isAdmin?: boolean;
   onTaskClick: (task: Task) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
@@ -29,18 +30,23 @@ const ALLOWED: Record<string, Record<string, string>> = {
   completed:   { pending: "pending", in_progress: "in_progress" },
 };
 
-export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRework, onRemoveRework, onApprove, currentUserId, onTaskClick, onEdit, onDelete }: Props) {
+export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRework, onRemoveRework, onApprove, currentUserId, isAdmin, onTaskClick, onEdit, onDelete }: Props) {
   function handleDragEnd(result: DropResult) {
     const { source, destination, draggableId } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
 
-    const fromStatus = source.droppableId;
     const toStatus = destination.droppableId;
 
     // Check permission for the target status
     if (toStatus === "in_progress" && !permissions.move_in_progress) return;
     if (toStatus === "completed"   && !permissions.move_completed)   return;
     if (toStatus === "pending"     && !permissions.move_in_progress) return;
+
+    // A delegated task (you created it but someone else is the assignee) is
+    // visible for tracking, but only the assignee or an admin can move it.
+    const task = tasks.find((t) => t.id === draggableId);
+    const canWorkOn = isAdmin || currentUserId === task?.assignee.id;
+    if (!canWorkOn) return;
 
     onStatusChange(draggableId, toStatus);
   }
@@ -92,6 +98,7 @@ export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRe
                               onRemoveRework={onRemoveRework}
                               onApprove={onApprove}
                               currentUserId={currentUserId}
+                              isAdmin={isAdmin}
                               onEdit={onEdit}
                               onDelete={onDelete}
                               onClick={() => onTaskClick(task)}

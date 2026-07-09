@@ -252,6 +252,7 @@ export default function TasksPage() {
           onRemoveRework={removeRework}
           onApprove={approveTask}
           currentUserId={currentUser?.id}
+          isAdmin={isAdmin}
           onTaskClick={setSelectedTask}
           onEdit={setEditTask}
           onDelete={isAdmin ? deleteTask : undefined}
@@ -271,6 +272,7 @@ export default function TasksPage() {
               onRemoveRework={removeRework}
               onApprove={approveTask}
               currentUserId={currentUser?.id}
+              isAdmin={isAdmin}
               onEdit={setEditTask}
               onDelete={isAdmin ? deleteTask : undefined}
               onClick={() => setSelectedTask(t)}

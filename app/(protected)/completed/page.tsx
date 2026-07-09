@@ -126,7 +126,7 @@ export default function CompletedPage() {
                 {normal.map(t => (
                   <TaskCard key={t.id} task={t} permissions={permissions}
                     onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework}
-                    onApprove={approveTask} currentUserId={currentUser?.id}
+                    onApprove={approveTask} currentUserId={currentUser?.id} isAdmin={isAdmin}
                     onClick={() => setSelected(t)} />
                 ))}
               </div>
@@ -146,7 +146,7 @@ export default function CompletedPage() {
                 {rework.map(t => (
                   <TaskCard key={t.id} task={t} permissions={permissions}
                     onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework}
-                    onApprove={approveTask} currentUserId={currentUser?.id}
+                    onApprove={approveTask} currentUserId={currentUser?.id} isAdmin={isAdmin}
                     onClick={() => setSelected(t)} />
                 ))}
               </div>

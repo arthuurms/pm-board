@@ -13,6 +13,7 @@ interface Props {
   onRemoveRework: (taskId: string) => void;
   onApprove?: (taskId: string) => void;
   currentUserId?: string;
+  isAdmin?: boolean;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
   onClick: () => void;
@@ -81,9 +82,12 @@ function ConfirmRework({ taskTitle, onConfirm, onCancel }: {
   );
 }
 
-export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onApprove, currentUserId, onEdit, onDelete, onClick }: Props) {
+export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onApprove, currentUserId, isAdmin, onEdit, onDelete, onClick }: Props) {
   const overdue = isOverdue(task);
   const canApprove = task.status === "completed" && !task.approved && currentUserId === task.creatorId;
+  // Only the assignee (or an admin) is actually on the hook to move the task through
+  // the pipeline — the creator merely delegated it and shouldn't see it as "theirs to do".
+  const canWorkOn = isAdmin || currentUserId === task.assignee.id;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -168,7 +172,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
 
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 pt-2 border-t" onClick={e => e.stopPropagation()}>
-          {task.status === "pending" && permissions.move_in_progress && (
+          {task.status === "pending" && permissions.move_in_progress && canWorkOn && (
             <button
               onClick={() => onStatusChange(task.id, "in_progress")}
               className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition-colors"
@@ -176,7 +180,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
               <Clock className="w-3 h-3" /> Iniciar
             </button>
           )}
-          {task.status === "in_progress" && permissions.move_completed && (
+          {task.status === "in_progress" && permissions.move_completed && canWorkOn && (
             <button
               onClick={() => onStatusChange(task.id, "completed")}
               className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
@@ -184,13 +188,18 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
               <CheckCircle className="w-3 h-3" /> Concluir
             </button>
           )}
-          {task.status === "completed" && permissions.move_in_progress && (
+          {task.status === "completed" && permissions.move_in_progress && canWorkOn && (
             <button
               onClick={() => onStatusChange(task.id, "in_progress")}
               className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors"
             >
               Reabrir
             </button>
+          )}
+          {!canWorkOn && currentUserId === task.creatorId && task.status !== "completed" && (
+            <span className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-violet-50 text-violet-600">
+              <User2 className="w-3 h-3" /> Delegada para {task.assignee.name}
+            </span>
           )}
           {canApprove && onApprove && (
             <button
