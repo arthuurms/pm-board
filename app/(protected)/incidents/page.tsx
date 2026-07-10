@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Incident, User } from "@/types";
 import { SeverityBadge, CategoryLabel } from "@/components/ui/Badge";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 
 interface FormState {
   title: string;
@@ -17,6 +17,7 @@ interface FormState {
 export default function IncidentsPage() {
   const { data: session } = useSession();
   const userId = (session?.user as { id?: string })?.id;
+  const isAdmin = (session?.user as { role?: string })?.role === "admin";
 
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -24,6 +25,7 @@ export default function IncidentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [filterMonth, setFilterMonth] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Incident | null>(null);
   const [form, setForm] = useState<FormState>({
     title: "", description: "", category: "ops_down", severity: "high",
     occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "",
@@ -61,6 +63,12 @@ export default function IncidentsPage() {
     if (!res.ok) { setFormError((await res.json()).error); return; }
     setShowForm(false);
     setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
+    load();
+  }
+
+  async function deleteIncident(id: string) {
+    await fetch(`/api/incidents/${id}`, { method: "DELETE" });
+    setDeleteTarget(null);
     load();
   }
 
@@ -103,7 +111,18 @@ export default function IncidentsPage() {
                   <p className="font-medium text-gray-900">{inc.title}</p>
                   {inc.description && <p className="text-sm text-gray-500 mt-0.5">{inc.description}</p>}
                 </div>
-                <SeverityBadge severity={inc.severity} />
+                <div className="flex items-center gap-2 shrink-0">
+                  <SeverityBadge severity={inc.severity} />
+                  {isAdmin && (
+                    <button
+                      onClick={() => setDeleteTarget(inc)}
+                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                      title="Excluir incidente"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                 <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded font-medium">
@@ -182,6 +201,25 @@ export default function IncidentsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </div>
+              <p className="font-semibold text-gray-900 text-sm">Excluir incidente?</p>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">Esta ação não pode ser desfeita:</p>
+            <p className="text-sm font-medium text-gray-800 bg-gray-50 rounded-lg px-3 py-2 mb-4 truncate">{deleteTarget.title}</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button onClick={() => deleteIncident(deleteTarget.id)} className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">Excluir</button>
+            </div>
           </div>
         </div>
       )}
