@@ -59,6 +59,19 @@ export interface Incident {
   relatedUserId?: string | null;
 }
 
+export interface Goal {
+  id: string;
+  title: string;
+  description?: string | null;
+  completed: boolean;
+  completedAt?: string | null;
+  createdAt: string;
+  assigneeId: string;
+  assignee: { id: string; name: string };
+  creatorId: string;
+  creator: { id: string; name: string };
+}
+
 export interface UserWithPermissions extends User {
   permissions: { action: string; granted: boolean }[];
 }

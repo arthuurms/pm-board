@@ -24,6 +24,8 @@ model User {
   permissions        UserPermission[]
   dailyTasks         DailyTask[]           @relation("DailyTaskAssignee")
   createdDailyTasks  DailyTask[]           @relation("DailyTaskCreator")
+  goals              Goal[]                @relation("GoalAssignee")
+  createdGoals       Goal[]                @relation("GoalCreator")
 }
 
 model Task {
@@ -110,6 +112,20 @@ model DailyTaskCompletion {
   userId      String
 
   @@unique([dailyTaskId, date])
+}
+
+// A goal assigned to a person (e.g. monthly targets), tracked until marked done
+model Goal {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  assigneeId  String
+  assignee    User      @relation("GoalAssignee", fields: [assigneeId], references: [id])
+  creatorId   String
+  creator     User      @relation("GoalCreator", fields: [creatorId], references: [id])
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
 }
 
 // Granular per-user permissions

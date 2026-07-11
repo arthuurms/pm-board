@@ -14,6 +14,7 @@ import {
   LogOut,
   ChevronRight,
   CalendarCheck,
+  Target,
   Sun,
   Moon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ const NAV_ALL = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
   { href: "/tasks", label: "Tarefas", icon: ListTodo, adminOnly: false },
   { href: "/daily-tasks", label: "Tarefas Diárias", icon: CalendarCheck, adminOnly: false },
+  { href: "/metas", label: "Metas", icon: Target, adminOnly: false },
   { href: "/completed", label: "Concluídas", icon: CheckCircle2, adminOnly: false },
   { href: "/rework", label: "Concluídas — Retrabalho", icon: RotateCcw, adminOnly: false },
   { href: "/incidents", label: "Incidentes", icon: AlertTriangle, adminOnly: false },
