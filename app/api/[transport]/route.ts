@@ -125,6 +125,51 @@ const mcpHandler = createMcpHandler(
     );
 
     server.registerTool(
+      "editar_tarefa",
+      {
+        title: "Editar tarefa",
+        description: "Edita uma tarefa já existente no Clickfy (busca pelo título, aceita parte do texto) — prazo, prioridade, título ou descrição.",
+        inputSchema: {
+          titulo: z.string().describe("Título (ou parte dele) da tarefa a editar"),
+          novoPrazo: z.string().optional().describe("Novo prazo, formato YYYY-MM-DDTHH:mm, horário de Brasília"),
+          novaPrioridade: z.enum(PRIORITY_VALUES).optional(),
+          novoTitulo: z.string().optional(),
+          novaDescricao: z.string().optional(),
+        },
+      },
+      async ({ titulo, novoPrazo, novaPrioridade, novoTitulo, novaDescricao }) => {
+        const candidates = await prisma.task.findMany({
+          where: { title: { contains: titulo, mode: "insensitive" } },
+          include: { assignee: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+        });
+
+        if (candidates.length === 0) {
+          return { isError: true, content: [{ type: "text", text: `Nenhuma tarefa encontrada com "${titulo}" no título.` }] };
+        }
+        if (candidates.length > 1) {
+          const lines = candidates.map((t) => `- "${t.title}" (responsável: ${t.assignee.name})`);
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Mais de uma tarefa encontrada com "${titulo}" — seja mais específico:\n${lines.join("\n")}` }],
+          };
+        }
+
+        const data: Record<string, unknown> = {};
+        if (novoPrazo) data.dueDate = parseBrasiliaDateTime(novoPrazo);
+        if (novaPrioridade) data.priority = novaPrioridade;
+        if (novoTitulo) data.title = novoTitulo;
+        if (novaDescricao) data.description = novaDescricao;
+
+        const updated = await prisma.task.update({ where: { id: candidates[0].id }, data });
+        const dueDateLabel = updated.dueDate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+        return {
+          content: [{ type: "text", text: `Tarefa "${updated.title}" atualizada. Prazo: ${dueDateLabel}, prioridade: ${updated.priority}.` }],
+        };
+      }
+    );
+
+    server.registerTool(
       "listar_pessoas",
       {
         title: "Listar pessoas",
