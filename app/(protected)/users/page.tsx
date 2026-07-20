@@ -36,10 +36,10 @@ export default function UsersPage() {
 
   // Tags (país)
   const [tags, setTags] = useState<Tag[]>([]);
-  const [newTag, setNewTag] = useState({ name: "", emoji: "" });
+  const [newTag, setNewTag] = useState({ name: "", color: "#6B7280" });
   const [tagError, setTagError] = useState("");
   const [editTagId, setEditTagId] = useState<string | null>(null);
-  const [editTagData, setEditTagData] = useState({ name: "", emoji: "" });
+  const [editTagData, setEditTagData] = useState({ name: "", color: "#6B7280" });
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -63,13 +63,13 @@ export default function UsersPage() {
       body: JSON.stringify(newTag),
     });
     if (!res.ok) { setTagError((await res.json()).error); return; }
-    setNewTag({ name: "", emoji: "" });
+    setNewTag({ name: "", color: "#6B7280" });
     loadTags();
   }
 
   function startEditTag(tag: Tag) {
     setEditTagId(tag.id);
-    setEditTagData({ name: tag.name, emoji: tag.emoji ?? "" });
+    setEditTagData({ name: tag.name, color: tag.color });
   }
 
   async function saveTagEdit(id: string) {
@@ -285,10 +285,10 @@ export default function UsersPage() {
                 <>
                   <div className="flex items-center gap-2 flex-1">
                     <input
-                      className="w-14 border rounded-lg px-2 py-1 text-sm text-center"
-                      value={editTagData.emoji}
-                      onChange={(e) => setEditTagData({ ...editTagData, emoji: e.target.value })}
-                      placeholder="🏳️"
+                      type="color"
+                      className="w-9 h-9 border rounded-lg cursor-pointer shrink-0"
+                      value={editTagData.color}
+                      onChange={(e) => setEditTagData({ ...editTagData, color: e.target.value })}
                     />
                     <input
                       className="flex-1 border rounded-lg px-2 py-1 text-sm"
@@ -303,7 +303,12 @@ export default function UsersPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-sm text-gray-800">{tag.emoji ? `${tag.emoji} ` : ""}{tag.name}</span>
+                  <span
+                    className="text-xs text-white px-2 py-0.5 rounded-full font-medium"
+                    style={{ backgroundColor: tag.color }}
+                  >
+                    {tag.name}
+                  </span>
                   {canManage && (
                     <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => startEditTag(tag)} className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors" title="Editar tag">
@@ -324,10 +329,10 @@ export default function UsersPage() {
         {canManage && (
           <form onSubmit={createTag} className="flex items-center gap-2 mt-3">
             <input
-              className="w-14 border rounded-lg px-2 py-1.5 text-sm text-center"
-              placeholder="🏳️"
-              value={newTag.emoji}
-              onChange={(e) => setNewTag({ ...newTag, emoji: e.target.value })}
+              type="color"
+              className="w-9 h-9 border rounded-lg cursor-pointer shrink-0"
+              value={newTag.color}
+              onChange={(e) => setNewTag({ ...newTag, color: e.target.value })}
             />
             <input
               className="flex-1 border rounded-lg px-3 py-1.5 text-sm"

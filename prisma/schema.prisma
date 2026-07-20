@@ -69,7 +69,7 @@ model Task {
 model Tag {
   id        String   @id @default(cuid())
   name      String   @unique
-  emoji     String? // e.g. a flag, shown before the name
+  color     String   @default("#6B7280") // hex color used for the badge background
   createdAt DateTime @default(now())
 
   tasks Task[]

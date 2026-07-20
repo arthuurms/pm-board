@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (user?.role !== "admin") return NextResponse.json({ error: "Apenas admins podem criar tags" }, { status: 403 });
 
-  const { name, emoji } = await req.json();
+  const { name, color } = await req.json();
   if (!name) return NextResponse.json({ error: "name é obrigatório" }, { status: 400 });
 
-  const tag = await prisma.tag.create({ data: { name, emoji: emoji || null } });
+  const tag = await prisma.tag.create({ data: { name, ...(color && { color }) } });
   return NextResponse.json(tag, { status: 201 });
 }

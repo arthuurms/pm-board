@@ -15,7 +15,7 @@ export interface User {
 export interface Tag {
   id: string;
   name: string;
-  emoji?: string | null;
+  color: string;
   createdAt: string;
 }
 

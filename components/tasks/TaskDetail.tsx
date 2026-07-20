@@ -49,8 +49,11 @@ export default function TaskDetail({ task, onClose }: Props) {
             <PriorityBadge priority={task.priority} />
             <StatusBadge status={task.status} />
             {task.tag && (
-              <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">
-                {task.tag.emoji} {task.tag.name}
+              <span
+                className="inline-flex items-center gap-1 text-xs text-white px-2 py-0.5 rounded-full font-medium"
+                style={{ backgroundColor: task.tag.color }}
+              >
+                {task.tag.name}
               </span>
             )}
             {task.isRework && (

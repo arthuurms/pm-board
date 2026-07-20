@@ -187,7 +187,7 @@ export default function TaskForm({ users, onCreated, onClose, editTask }: Props)
             >
               <option value="">Sem tag</option>
               {tags.map((t) => (
-                <option key={t.id} value={t.id}>{t.emoji ? `${t.emoji} ` : ""}{t.name}</option>
+                <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
           </div>

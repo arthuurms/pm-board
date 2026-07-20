@@ -15,10 +15,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!(await requireAdmin(userId))) return NextResponse.json({ error: "Apenas admins podem editar tags" }, { status: 403 });
 
   const { id } = await params;
-  const { name, emoji } = await req.json();
+  const { name, color } = await req.json();
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
-  if (emoji !== undefined) data.emoji = emoji || null;
+  if (color !== undefined) data.color = color;
 
   const tag = await prisma.tag.update({ where: { id }, data });
   return NextResponse.json(tag);

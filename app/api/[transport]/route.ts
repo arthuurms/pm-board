@@ -142,7 +142,7 @@ const mcpHandler = createMcpHandler(
 
         const lines = tasks.map((t) => {
           const dueDateLabel = t.dueDate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
-          const tagLabel = t.tag ? ` | tag: ${t.tag.emoji ? t.tag.emoji + " " : ""}${t.tag.name}` : "";
+          const tagLabel = t.tag ? ` | tag: ${t.tag.name}` : "";
           return `- "${t.title}"${t.description ? ` — ${t.description}` : ""} | responsável: ${t.assignee.name} | solicitado por: ${t.creator.name} | prazo: ${dueDateLabel} | status: ${t.status}${tagLabel}`;
         });
         return { content: [{ type: "text", text: lines.join("\n") }] };
@@ -233,7 +233,7 @@ const mcpHandler = createMcpHandler(
       async () => {
         const tags = await prisma.tag.findMany({ orderBy: { name: "asc" } });
         if (tags.length === 0) return { content: [{ type: "text", text: "Nenhuma tag cadastrada." }] };
-        return { content: [{ type: "text", text: tags.map((t) => `${t.emoji ? t.emoji + " " : ""}${t.name}`).join("\n") }] };
+        return { content: [{ type: "text", text: tags.map((t) => t.name).join("\n") }] };
       }
     );
 
