@@ -156,6 +156,7 @@ const mcpHandler = createMcpHandler(
         description: "Edita uma tarefa já existente no Clickfy (busca pelo título, aceita parte do texto) — prazo, prioridade, título ou descrição.",
         inputSchema: {
           titulo: z.string().describe("Título (ou parte dele) da tarefa a editar"),
+          responsavel: z.string().optional().describe("Nome do responsável, para desempatar quando mais de uma tarefa tem título parecido"),
           novoPrazo: z.string().optional().describe("Novo prazo, formato YYYY-MM-DDTHH:mm, horário de Brasília"),
           novaPrioridade: z.enum(PRIORITY_VALUES).optional(),
           novoTitulo: z.string().optional(),
@@ -163,9 +164,25 @@ const mcpHandler = createMcpHandler(
           novoPais: z.string().optional().describe("Nova tag de país, ex: Colômbia, México, Holanda"),
         },
       },
-      async ({ titulo, novoPrazo, novaPrioridade, novoTitulo, novaDescricao, novoPais }) => {
+      async ({ titulo, responsavel, novoPrazo, novaPrioridade, novoTitulo, novaDescricao, novoPais }) => {
+        let assigneeFilter: string | undefined;
+        if (responsavel) {
+          const assignee = await resolveUser(responsavel);
+          if (!assignee) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Não encontrei ninguém chamado "${responsavel}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }],
+            };
+          }
+          assigneeFilter = assignee.id;
+        }
+
         const candidates = await prisma.task.findMany({
-          where: { title: { contains: titulo, mode: "insensitive" } },
+          where: {
+            title: { contains: titulo, mode: "insensitive" },
+            ...(assigneeFilter ? { assigneeId: assigneeFilter } : {}),
+          },
           include: { assignee: { select: { name: true } } },
           orderBy: { createdAt: "desc" },
         });
