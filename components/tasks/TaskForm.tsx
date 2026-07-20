@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { User, Task, Priority } from "@/types";
+import { useState, useEffect } from "react";
+import { User, Task, Priority, Tag } from "@/types";
 import { X, Zap, Paperclip, Loader2 } from "lucide-react";
 
 interface Props {
@@ -46,10 +46,14 @@ export default function TaskForm({ users, onCreated, onClose, editTask }: Props)
     assigneeId: editTask?.assigneeId ?? users[0]?.id ?? "",
     attachmentUrl: editTask?.attachmentUrl ?? "",
     attachmentName: editTask?.attachmentName ?? "",
+    tagId: editTask?.tagId ?? "",
   });
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [tags, setTags] = useState<Tag[]>([]);
+
+  useEffect(() => { fetch("/api/tags").then((r) => r.json()).then(setTags); }, []);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -171,6 +175,21 @@ export default function TaskForm({ users, onCreated, onClose, editTask }: Props)
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Tag (país) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tag (país)</label>
+            <select
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              value={form.tagId}
+              onChange={(e) => setForm({ ...form, tagId: e.target.value })}
+            >
+              <option value="">Sem tag</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>{t.emoji ? `${t.emoji} ` : ""}{t.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Due date + shortcuts */}

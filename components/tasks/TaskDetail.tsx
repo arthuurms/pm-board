@@ -48,6 +48,11 @@ export default function TaskDetail({ task, onClose }: Props) {
           <div className="flex gap-2 flex-wrap">
             <PriorityBadge priority={task.priority} />
             <StatusBadge status={task.status} />
+            {task.tag && (
+              <span className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">
+                {task.tag.emoji} {task.tag.name}
+              </span>
+            )}
             {task.isRework && (
               <span className="inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-medium">
                 <RotateCcw className="w-3 h-3" /> Retrabalho

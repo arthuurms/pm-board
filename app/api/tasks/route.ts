@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/permissions";
 const INCLUDE = {
   assignee: { select: { id: true, name: true, email: true } },
   creator: { select: { id: true, name: true } },
+  tag: true,
   statusHistory: {
     include: { changedBy: { select: { id: true, name: true } } },
     orderBy: { changedAt: "asc" as const },
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { title, description, priority, dueDate, assigneeId, attachmentUrl, attachmentName } = body;
+  const { title, description, priority, dueDate, assigneeId, attachmentUrl, attachmentName, tagId } = body;
 
   if (!title || !dueDate || !assigneeId) {
     return NextResponse.json({ error: "title, dueDate and assigneeId are required" }, { status: 400 });
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
       creatorId: userId,
       attachmentUrl: attachmentUrl || null,
       attachmentName: attachmentName || null,
+      tagId: tagId || null,
     },
     include: INCLUDE,
   });

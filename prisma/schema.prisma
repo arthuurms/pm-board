@@ -58,7 +58,21 @@ model Task {
   originalTask   Task?   @relation("ReworkOf", fields: [originalTaskId], references: [id])
   reworkTasks    Task[]  @relation("ReworkOf")
 
+  tagId String?
+  tag   Tag?    @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
   statusHistory StatusHistory[]
+}
+
+// Small label shown on a task card (e.g. a country) so people don't lose
+// track of which market a task belongs to. Admin-managed.
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  emoji     String? // e.g. a flag, shown before the name
+  createdAt DateTime @default(now())
+
+  tasks Task[]
 }
 
 model StatusHistory {

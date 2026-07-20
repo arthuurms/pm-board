@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { User } from "@/types";
+import { User, Tag } from "@/types";
 import { ACTION_LABELS, ALL_ACTIONS } from "@/lib/permissions";
-import { Users, Plus, Shield, Check, Pencil, Trash2, X } from "lucide-react";
+import { Users, Plus, Shield, Check, Pencil, Trash2, X, Tag as TagIcon } from "lucide-react";
 
 interface UserWithPerms extends User {
   permissions?: Record<string, boolean>;
@@ -34,10 +34,58 @@ export default function UsersPage() {
   const [deleteUser, setDeleteUser] = useState<UserWithPerms | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
+  // Tags (país)
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [newTag, setNewTag] = useState({ name: "", emoji: "" });
+  const [tagError, setTagError] = useState("");
+  const [editTagId, setEditTagId] = useState<string | null>(null);
+  const [editTagData, setEditTagData] = useState({ name: "", emoji: "" });
+
   useEffect(() => {
     if (!currentUserId) return;
     fetch(`/api/users/${currentUserId}/permissions`).then((r) => r.json()).then(setMyPermissions);
   }, [currentUserId]);
+
+  const loadTags = useCallback(async () => {
+    const res = await fetch("/api/tags");
+    setTags(await res.json());
+  }, []);
+
+  useEffect(() => { loadTags(); }, [loadTags]);
+
+  async function createTag(e: React.FormEvent) {
+    e.preventDefault();
+    setTagError("");
+    if (!newTag.name.trim()) { setTagError("Informe um nome"); return; }
+    const res = await fetch("/api/tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newTag),
+    });
+    if (!res.ok) { setTagError((await res.json()).error); return; }
+    setNewTag({ name: "", emoji: "" });
+    loadTags();
+  }
+
+  function startEditTag(tag: Tag) {
+    setEditTagId(tag.id);
+    setEditTagData({ name: tag.name, emoji: tag.emoji ?? "" });
+  }
+
+  async function saveTagEdit(id: string) {
+    await fetch(`/api/tags/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editTagData),
+    });
+    setEditTagId(null);
+    loadTags();
+  }
+
+  async function deleteTag(id: string) {
+    await fetch(`/api/tags/${id}`, { method: "DELETE" });
+    loadTags();
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -221,6 +269,79 @@ export default function UsersPage() {
           ))}
         </div>
       )}
+
+      {/* Tags (país) */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-3">
+          <TagIcon className="w-5 h-5 text-violet-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Tags de Tarefa (país)</h2>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">Aparecem no card da tarefa, ao lado da prioridade e do status.</p>
+
+        <div className="bg-white rounded-xl border shadow-sm divide-y">
+          {tags.map((tag) => (
+            <div key={tag.id} className="flex items-center justify-between p-3 gap-3">
+              {editTagId === tag.id ? (
+                <>
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      className="w-14 border rounded-lg px-2 py-1 text-sm text-center"
+                      value={editTagData.emoji}
+                      onChange={(e) => setEditTagData({ ...editTagData, emoji: e.target.value })}
+                      placeholder="🏳️"
+                    />
+                    <input
+                      className="flex-1 border rounded-lg px-2 py-1 text-sm"
+                      value={editTagData.name}
+                      onChange={(e) => setEditTagData({ ...editTagData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => saveTagEdit(tag.id)} className="px-3 py-1 text-xs rounded-lg bg-violet-600 text-white hover:bg-violet-700">Salvar</button>
+                    <button onClick={() => setEditTagId(null)} className="px-3 py-1 text-xs rounded-lg border hover:bg-gray-50">Cancelar</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-gray-800">{tag.emoji ? `${tag.emoji} ` : ""}{tag.name}</span>
+                  {canManage && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => startEditTag(tag)} className="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors" title="Editar tag">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => deleteTag(tag.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors" title="Excluir tag">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+          {tags.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Nenhuma tag cadastrada</p>}
+        </div>
+
+        {canManage && (
+          <form onSubmit={createTag} className="flex items-center gap-2 mt-3">
+            <input
+              className="w-14 border rounded-lg px-2 py-1.5 text-sm text-center"
+              placeholder="🏳️"
+              value={newTag.emoji}
+              onChange={(e) => setNewTag({ ...newTag, emoji: e.target.value })}
+            />
+            <input
+              className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+              placeholder="Nome da tag (ex: Alemanha)"
+              value={newTag.name}
+              onChange={(e) => setNewTag({ ...newTag, name: e.target.value })}
+            />
+            <button type="submit" className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-700">
+              <Plus className="w-4 h-4" /> Adicionar
+            </button>
+          </form>
+        )}
+        {tagError && <p className="text-sm text-red-600 mt-2">{tagError}</p>}
+      </div>
 
       {/* Create modal */}
       {showForm && (

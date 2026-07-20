@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 const INCLUDE = {
   assignee: { select: { id: true, name: true, email: true } },
   creator: { select: { id: true, name: true } },
+  tag: true,
   statusHistory: {
     include: { changedBy: { select: { id: true, name: true } } },
     orderBy: { changedAt: "asc" as const },
@@ -50,6 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.originalTaskId !== undefined && { originalTaskId: body.originalTaskId }),
       ...(body.attachmentUrl !== undefined && { attachmentUrl: body.attachmentUrl }),
       ...(body.attachmentName !== undefined && { attachmentName: body.attachmentName }),
+      ...(body.tagId !== undefined && { tagId: body.tagId || null }),
     },
     include: INCLUDE,
   });

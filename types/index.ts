@@ -12,6 +12,13 @@ export interface User {
   createdAt: string;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  emoji?: string | null;
+  createdAt: string;
+}
+
 export interface StatusHistory {
   id: string;
   fromStatus: string | null;
@@ -34,6 +41,8 @@ export interface Task {
   approvedAt?: string | null;
   attachmentUrl?: string | null;
   attachmentName?: string | null;
+  tagId?: string | null;
+  tag?: Tag | null;
   dueDate: string;
   startedAt?: string | null;
   completedAt?: string | null;

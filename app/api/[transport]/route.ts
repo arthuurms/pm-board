@@ -18,6 +18,15 @@ async function resolveUser(name: string) {
   );
 }
 
+async function resolveTag(name: string) {
+  const tags = await prisma.tag.findMany();
+  const target = normalize(name);
+  return (
+    tags.find((t) => normalize(t.name) === target) ??
+    tags.find((t) => normalize(t.name).includes(target))
+  );
+}
+
 // "YYYY-MM-DDTHH:mm" with no offset is treated as Brasília local time (fixed
 // -03:00 — Brazil has not observed DST since 2019). If an offset/Z is already
 // present, it's used as-is.
@@ -40,9 +49,10 @@ const mcpHandler = createMcpHandler(
           solicitadoPor: z.string().describe("Nome de quem está pedindo/solicitando a criação da tarefa"),
           prazo: z.string().describe("Data e hora limite no formato YYYY-MM-DDTHH:mm, horário de Brasília"),
           prioridade: z.enum(PRIORITY_VALUES).optional().describe("low, medium, high ou urgent (padrão: medium)"),
+          pais: z.string().optional().describe("Tag de país da tarefa, ex: Colômbia, México, Holanda (opcional)"),
         },
       },
-      async ({ titulo, descricao, responsavel, solicitadoPor, prazo, prioridade }) => {
+      async ({ titulo, descricao, responsavel, solicitadoPor, prazo, prioridade, pais }) => {
         const assignee = await resolveUser(responsavel);
         const creator = await resolveUser(solicitadoPor);
 
@@ -56,6 +66,19 @@ const mcpHandler = createMcpHandler(
           };
         }
 
+        let tagId: string | undefined;
+        if (pais) {
+          const tag = await resolveTag(pais);
+          if (!tag) {
+            const tags = await prisma.tag.findMany();
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Não encontrei a tag "${pais}". Tags cadastradas: ${tags.map((t) => t.name).join(", ")}` }],
+            };
+          }
+          tagId = tag.id;
+        }
+
         const dueDate = parseBrasiliaDateTime(prazo);
         const task = await prisma.task.create({
           data: {
@@ -65,6 +88,7 @@ const mcpHandler = createMcpHandler(
             dueDate,
             assigneeId: assignee.id,
             creatorId: creator.id,
+            tagId,
           },
         });
 
@@ -107,7 +131,7 @@ const mcpHandler = createMcpHandler(
 
         const tasks = await prisma.task.findMany({
           where: assigneeId ? { assigneeId } : {},
-          include: { assignee: { select: { name: true } }, creator: { select: { name: true } } },
+          include: { assignee: { select: { name: true } }, creator: { select: { name: true } }, tag: true },
           orderBy: { createdAt: "desc" },
           take: 30,
         });
@@ -118,7 +142,8 @@ const mcpHandler = createMcpHandler(
 
         const lines = tasks.map((t) => {
           const dueDateLabel = t.dueDate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
-          return `- "${t.title}"${t.description ? ` — ${t.description}` : ""} | responsável: ${t.assignee.name} | solicitado por: ${t.creator.name} | prazo: ${dueDateLabel} | status: ${t.status}`;
+          const tagLabel = t.tag ? ` | tag: ${t.tag.emoji ? t.tag.emoji + " " : ""}${t.tag.name}` : "";
+          return `- "${t.title}"${t.description ? ` — ${t.description}` : ""} | responsável: ${t.assignee.name} | solicitado por: ${t.creator.name} | prazo: ${dueDateLabel} | status: ${t.status}${tagLabel}`;
         });
         return { content: [{ type: "text", text: lines.join("\n") }] };
       }
@@ -135,9 +160,10 @@ const mcpHandler = createMcpHandler(
           novaPrioridade: z.enum(PRIORITY_VALUES).optional(),
           novoTitulo: z.string().optional(),
           novaDescricao: z.string().optional(),
+          novoPais: z.string().optional().describe("Nova tag de país, ex: Colômbia, México, Holanda"),
         },
       },
-      async ({ titulo, novoPrazo, novaPrioridade, novoTitulo, novaDescricao }) => {
+      async ({ titulo, novoPrazo, novaPrioridade, novoTitulo, novaDescricao, novoPais }) => {
         const candidates = await prisma.task.findMany({
           where: { title: { contains: titulo, mode: "insensitive" } },
           include: { assignee: { select: { name: true } } },
@@ -160,12 +186,37 @@ const mcpHandler = createMcpHandler(
         if (novaPrioridade) data.priority = novaPrioridade;
         if (novoTitulo) data.title = novoTitulo;
         if (novaDescricao) data.description = novaDescricao;
+        if (novoPais) {
+          const tag = await resolveTag(novoPais);
+          if (!tag) {
+            const tags = await prisma.tag.findMany();
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Não encontrei a tag "${novoPais}". Tags cadastradas: ${tags.map((t) => t.name).join(", ")}` }],
+            };
+          }
+          data.tagId = tag.id;
+        }
 
         const updated = await prisma.task.update({ where: { id: candidates[0].id }, data });
         const dueDateLabel = updated.dueDate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
         return {
           content: [{ type: "text", text: `Tarefa "${updated.title}" atualizada. Prazo: ${dueDateLabel}, prioridade: ${updated.priority}.` }],
         };
+      }
+    );
+
+    server.registerTool(
+      "listar_tags",
+      {
+        title: "Listar tags",
+        description: "Lista as tags de país disponíveis no Clickfy para atribuir a uma tarefa.",
+        inputSchema: {},
+      },
+      async () => {
+        const tags = await prisma.tag.findMany({ orderBy: { name: "asc" } });
+        if (tags.length === 0) return { content: [{ type: "text", text: "Nenhuma tag cadastrada." }] };
+        return { content: [{ type: "text", text: tags.map((t) => `${t.emoji ? t.emoji + " " : ""}${t.name}`).join("\n") }] };
       }
     );
 
