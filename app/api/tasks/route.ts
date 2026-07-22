@@ -65,17 +65,20 @@ export async function GET(req: NextRequest) {
     orderBy: { dueDate: "asc" },
   });
 
-  if (status === "completed") {
-    // Most recently completed first, so it's obvious at a glance what
-    // someone just finished instead of it being buried by priority/due date.
-    tasks.sort((a, b) => new Date(b.completedAt ?? 0).getTime() - new Date(a.completedAt ?? 0).getTime());
-  } else {
-    // Priority is a plain string field, so sorting it alphabetically ("desc")
-    // doesn't match real urgency (e.g. "high" sorts after "medium"). Rank
-    // explicitly instead: Urgente, Alta, Média, Baixa.
-    const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-    tasks.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99));
+  // Priority is a plain string field, so sorting it alphabetically ("desc")
+  // doesn't match real urgency (e.g. "high" sorts after "medium"). Rank
+  // explicitly instead: Urgente, Alta, Média, Baixa.
+  const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+  // Each task is sorted by a key based on its OWN status — completed tasks go
+  // by most-recently-finished, everything else by priority. This keeps both
+  // the dedicated Concluídas view (status=completed only) and the Kanban
+  // board (all statuses in one request, split into columns client-side)
+  // correctly ordered without needing to know which view is asking.
+  function sortKey(t: (typeof tasks)[number]): number {
+    if (t.status === "completed") return -new Date(t.completedAt ?? 0).getTime();
+    return PRIORITY_RANK[t.priority] ?? 99;
   }
+  tasks.sort((a, b) => sortKey(a) - sortKey(b));
 
   return NextResponse.json(tasks);
 }
