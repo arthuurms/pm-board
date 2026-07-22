@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/permissions";
 
 const INCLUDE = {
   assignee: { select: { id: true, name: true, email: true } },
@@ -35,8 +36,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   const isCreator = existing.creatorId === userId;
   const isAdmin = user?.role === "admin";
-  if (!isCreator && !isAdmin) {
-    return NextResponse.json({ error: "Apenas quem criou a tarefa pode editá-la" }, { status: 403 });
+  if (!isCreator && !isAdmin && !(await hasPermission(userId, "manage_all_tasks"))) {
+    return NextResponse.json({ error: "Apenas quem criou a tarefa (ou quem tem permissão) pode editá-la" }, { status: 403 });
   }
 
   const task = await prisma.task.update({
@@ -65,7 +66,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const userId = (session.user as { id: string; role: string }).id;
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (user?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (user?.role !== "admin" && !(await hasPermission(userId, "manage_all_tasks"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { id } = await params;
   await prisma.task.delete({ where: { id } });

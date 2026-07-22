@@ -88,9 +88,10 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
   // Only the assignee (or an admin) is actually on the hook to move the task through
   // the pipeline — the creator merely delegated it and shouldn't see it as "theirs to do".
   const canWorkOn = isAdmin || currentUserId === task.assignee.id;
-  // Only whoever created the task (or an admin) can change its details — the
+  // Only whoever created the task (or an admin, or someone granted
+  // manage_all_tasks e.g. a general manager) can change its details — the
   // assignee shouldn't be able to edit the deadline or other info themselves.
-  const canEdit = isAdmin || currentUserId === task.creatorId;
+  const canEdit = isAdmin || currentUserId === task.creatorId || permissions.manage_all_tasks;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 

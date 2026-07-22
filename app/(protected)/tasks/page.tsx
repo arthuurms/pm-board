@@ -62,6 +62,7 @@ export default function TasksPage() {
 
   const isAdmin = currentUser?.role === "admin";
   const canViewAll = isAdmin || permissions.view_all_tasks;
+  const canManageAll = isAdmin || permissions.manage_all_tasks;
 
   const load = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -267,7 +268,7 @@ export default function TasksPage() {
           isAdmin={isAdmin}
           onTaskClick={setSelectedTask}
           onEdit={setEditTask}
-          onDelete={isAdmin ? deleteTask : undefined}
+          onDelete={canManageAll ? deleteTask : undefined}
         />
       )}
 
@@ -286,7 +287,7 @@ export default function TasksPage() {
               currentUserId={currentUser?.id}
               isAdmin={isAdmin}
               onEdit={setEditTask}
-              onDelete={isAdmin ? deleteTask : undefined}
+              onDelete={canManageAll ? deleteTask : undefined}
               onClick={() => setSelectedTask(t)}
             />
           ))}
