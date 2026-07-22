@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
   const priority = searchParams.get("priority");
   const isRework = searchParams.get("isRework");
   const month = searchParams.get("month"); // YYYY-MM
+  const days = searchParams.get("days"); // last N days, by completedAt
 
   const requester = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   const isAdmin = requester?.role === "admin";
@@ -52,6 +53,10 @@ export async function GET(req: NextRequest) {
     const start = new Date(y, m - 1, 1);
     const end = new Date(y, m, 1);
     where.completedAt = { gte: start, lt: end };
+  } else if (days) {
+    const start = new Date();
+    start.setDate(start.getDate() - Number(days));
+    where.completedAt = { gte: start };
   }
 
   const tasks = await prisma.task.findMany({
@@ -60,11 +65,17 @@ export async function GET(req: NextRequest) {
     orderBy: { dueDate: "asc" },
   });
 
-  // Priority is a plain string field, so sorting it alphabetically ("desc")
-  // doesn't match real urgency (e.g. "high" sorts after "medium"). Rank
-  // explicitly instead: Urgente, Alta, Média, Baixa.
-  const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-  tasks.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99));
+  if (status === "completed") {
+    // Most recently completed first, so it's obvious at a glance what
+    // someone just finished instead of it being buried by priority/due date.
+    tasks.sort((a, b) => new Date(b.completedAt ?? 0).getTime() - new Date(a.completedAt ?? 0).getTime());
+  } else {
+    // Priority is a plain string field, so sorting it alphabetically ("desc")
+    // doesn't match real urgency (e.g. "high" sorts after "medium"). Rank
+    // explicitly instead: Urgente, Alta, Média, Baixa.
+    const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+    tasks.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99));
+  }
 
   return NextResponse.json(tasks);
 }

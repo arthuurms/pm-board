@@ -16,18 +16,35 @@ export default function CompletedPage() {
   const [selectedTask, setSelected] = useState<Task | null>(null);
   const [filterUser, setFilterUser] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
+  const [filterDays, setFilterDays] = useState("3");
   const [loading, setLoading]     = useState(true);
 
-  // Restore the last person filter so it survives a page reload.
+  // Restore the last filters so they survive a page reload.
   useEffect(() => {
-    const saved = localStorage.getItem("clickfy:completed:filterUser");
-    if (saved) setFilterUser(saved);
+    const savedUser = localStorage.getItem("clickfy:completed:filterUser");
+    if (savedUser) setFilterUser(savedUser);
+    const savedDays = localStorage.getItem("clickfy:completed:filterDays");
+    if (savedDays !== null) setFilterDays(savedDays);
   }, []);
 
   useEffect(() => {
     if (filterUser) localStorage.setItem("clickfy:completed:filterUser", filterUser);
     else localStorage.removeItem("clickfy:completed:filterUser");
   }, [filterUser]);
+
+  useEffect(() => {
+    localStorage.setItem("clickfy:completed:filterDays", filterDays);
+  }, [filterDays]);
+
+  function selectDays(value: string) {
+    setFilterDays(value);
+    setFilterMonth("");
+  }
+
+  function selectMonth(value: string) {
+    setFilterMonth(value);
+    setFilterDays("");
+  }
 
   useEffect(() => { fetch("/api/users").then(r => r.json()).then(setUsers); }, []);
 
@@ -45,10 +62,11 @@ export default function CompletedPage() {
     const params = new URLSearchParams({ status: "completed" });
     if (canViewAll && filterUser) params.set("assigneeId", filterUser);
     if (filterMonth) params.set("month", filterMonth);
+    else if (filterDays) params.set("days", filterDays);
     const res = await fetch(`/api/tasks?${params}`);
     setTasks(await res.json());
     setLoading(false);
-  }, [currentUser?.id, canViewAll, filterUser, filterMonth]);
+  }, [currentUser?.id, canViewAll, filterUser, filterMonth, filterDays]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -98,7 +116,7 @@ export default function CompletedPage() {
       <p className="text-sm text-gray-500 mb-6">Todas as tarefas entregues</p>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
+      <div className="flex flex-wrap items-center gap-3 mb-5">
         {canViewAll && (
           <select
             className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -110,10 +128,33 @@ export default function CompletedPage() {
             ))}
           </select>
         )}
+
+        <div className="flex rounded-lg border overflow-hidden">
+          {[
+            { value: "3", label: "3 dias" },
+            { value: "7", label: "7 dias" },
+            { value: "30", label: "30 dias" },
+            { value: "", label: "Tudo" },
+          ].map((opt, i) => (
+            <button
+              key={opt.value}
+              onClick={() => selectDays(opt.value)}
+              className={`px-3 py-1.5 text-sm transition-colors ${i > 0 ? "border-l" : ""} ${
+                !filterMonth && filterDays === opt.value
+                  ? "bg-violet-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <span className="text-xs text-gray-400">ou mês específico:</span>
         <input
           type="month"
           className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-          value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+          value={filterMonth} onChange={e => selectMonth(e.target.value)}
         />
       </div>
 
