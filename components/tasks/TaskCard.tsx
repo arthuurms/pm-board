@@ -11,6 +11,7 @@ interface Props {
   onStatusChange: (taskId: string, newStatus: string) => void;
   onMarkRework: (taskId: string, reason: string) => void;
   onRemoveRework: (taskId: string) => void;
+  onEditReworkReason?: (taskId: string, reason: string) => void;
   onApprove?: (taskId: string) => void;
   currentUserId?: string;
   isAdmin?: boolean;
@@ -105,7 +106,63 @@ function ConfirmRework({ taskTitle, onConfirm, onCancel }: {
   );
 }
 
-export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onApprove, currentUserId, isAdmin, onEdit, onDelete, onClick }: Props) {
+// Inline dialog for fixing/expanding an already-registered rework reason
+function EditReworkReason({ taskTitle, initialReason, onSave, onCancel }: {
+  taskTitle: string;
+  initialReason: string;
+  onSave: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState(initialReason);
+  const [error, setError] = useState(false);
+
+  function handleSave() {
+    if (!reason.trim()) { setError(true); return; }
+    onSave(reason.trim());
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCancel}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+              <Pencil className="w-4 h-4 text-orange-600" />
+            </div>
+            <p className="font-semibold text-gray-900 text-sm">Editar motivo do retrabalho</p>
+          </div>
+          <button onClick={onCancel} className="p-1 hover:bg-gray-100 rounded text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-sm font-medium text-gray-800 bg-gray-50 rounded-lg px-3 py-2 mb-3 truncate">
+          {taskTitle}
+        </p>
+        <textarea
+          className={clsx(
+            "w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 mb-1",
+            error && "border-red-400"
+          )}
+          rows={3}
+          value={reason}
+          onChange={e => { setReason(e.target.value); setError(false); }}
+          autoFocus
+        />
+        {error && <p className="text-xs text-red-600 mb-2">O motivo não pode ficar em branco.</p>}
+        <div className="flex gap-2 mt-3">
+          <button onClick={onCancel} className="flex-1 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 transition-colors">
+            Cancelar
+          </button>
+          <button onClick={handleSave} className="flex-1 px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium">
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onEditReworkReason, onApprove, currentUserId, isAdmin, onEdit, onDelete, onClick }: Props) {
   const overdue = isOverdue(task);
   const canApprove = task.status === "completed" && !task.approved && currentUserId === task.creatorId;
   // Only the assignee (or an admin) is actually on the hook to move the task through
@@ -117,6 +174,7 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
   const canEdit = isAdmin || currentUserId === task.creatorId || permissions.manage_all_tasks;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditReason, setShowEditReason] = useState(false);
 
   function handleAddRework() {
     setShowConfirm(true);
@@ -171,9 +229,18 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
         </div>
 
         {task.isRework && task.reworkReason && (
-          <div className="flex items-start gap-1.5 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 mb-2">
+          <div className="flex items-start gap-1.5 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 mb-2" onClick={e => e.stopPropagation()}>
             <RotateCcw className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-orange-800"><span className="font-semibold">Motivo:</span> {task.reworkReason}</p>
+            <p className="text-xs text-orange-800 flex-1"><span className="font-semibold">Motivo:</span> {task.reworkReason}</p>
+            {permissions.mark_rework && onEditReworkReason && (
+              <button
+                onClick={() => setShowEditReason(true)}
+                className="p-0.5 text-orange-400 hover:text-orange-700 shrink-0"
+                title="Editar motivo do retrabalho"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         )}
 
@@ -330,6 +397,15 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           taskTitle={task.title}
           onConfirm={handleConfirm}
           onCancel={() => setShowConfirm(false)}
+        />
+      )}
+
+      {showEditReason && (
+        <EditReworkReason
+          taskTitle={task.title}
+          initialReason={task.reworkReason ?? ""}
+          onSave={(reason) => { setShowEditReason(false); onEditReworkReason!(task.id, reason); }}
+          onCancel={() => setShowEditReason(false)}
         />
       )}
     </>

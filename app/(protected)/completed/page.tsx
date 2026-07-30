@@ -112,6 +112,14 @@ export default function CompletedPage() {
     load();
   }
 
+  async function editReworkReason(taskId: string, reason: string) {
+    await fetch(`/api/tasks/${taskId}/status`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateReworkReason: reason }),
+    });
+    load();
+  }
+
   async function approveTask(taskId: string) {
     await fetch(`/api/tasks/${taskId}/status`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -196,7 +204,7 @@ export default function CompletedPage() {
               <div className="space-y-3">
                 {normal.map(t => (
                   <TaskCard key={t.id} task={t} permissions={permissions}
-                    onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework}
+                    onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework} onEditReworkReason={editReworkReason}
                     onApprove={approveTask} currentUserId={currentUser?.id} isAdmin={isAdmin}
                     onClick={() => setSelected(t)} />
                 ))}
@@ -216,7 +224,7 @@ export default function CompletedPage() {
               <div className="space-y-3">
                 {rework.map(t => (
                   <TaskCard key={t.id} task={t} permissions={permissions}
-                    onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework}
+                    onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework} onEditReworkReason={editReworkReason}
                     onApprove={approveTask} currentUserId={currentUser?.id} isAdmin={isAdmin}
                     onClick={() => setSelected(t)} />
                 ))}

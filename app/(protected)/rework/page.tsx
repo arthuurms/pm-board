@@ -71,6 +71,15 @@ export default function ReworkPage() {
     load();
   }
 
+  async function editReworkReason(taskId: string, reason: string) {
+    await fetch(`/api/tasks/${taskId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateReworkReason: reason }),
+    });
+    load();
+  }
+
   const completed = tasks.filter((t) => t.status === "completed");
   const active = tasks.filter((t) => t.status !== "completed");
 
@@ -99,7 +108,7 @@ export default function ReworkPage() {
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Em andamento</h2>
               <div className="space-y-3">
                 {active.map((t) => (
-                  <TaskCard key={t.id} task={t} permissions={permissions} onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework} onClick={() => setSelectedTask(t)} />
+                  <TaskCard key={t.id} task={t} permissions={permissions} onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework} onEditReworkReason={editReworkReason} onClick={() => setSelectedTask(t)} />
                 ))}
               </div>
             </div>
@@ -109,7 +118,7 @@ export default function ReworkPage() {
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Concluídas</h2>
               <div className="space-y-3">
                 {completed.map((t) => (
-                  <TaskCard key={t.id} task={t} permissions={permissions} onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework} onClick={() => setSelectedTask(t)} />
+                  <TaskCard key={t.id} task={t} permissions={permissions} onStatusChange={changeStatus} onMarkRework={markRework} onRemoveRework={removeRework} onEditReworkReason={editReworkReason} onClick={() => setSelectedTask(t)} />
                 ))}
               </div>
             </div>

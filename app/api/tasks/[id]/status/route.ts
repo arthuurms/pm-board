@@ -123,6 +123,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     justApproved = true;
   }
 
+  // Lets whoever can mark rework fix a typo/add detail to an existing
+  // reason, without re-triggering the whole rework flow (count, status, etc).
+  if (body.updateReworkReason !== undefined) {
+    const allowed = await hasPermission(userId, "mark_rework");
+    if (!allowed) return NextResponse.json({ error: "Sem permissão para editar o motivo do retrabalho" }, { status: 403 });
+    updateData.reworkReason = body.updateReworkReason || null;
+  }
+
   if (body.removeRework === true) {
     const allowed = await hasPermission(userId, "mark_rework");
     if (!allowed) return NextResponse.json({ error: "Sem permissão para alterar retrabalho" }, { status: 403 });

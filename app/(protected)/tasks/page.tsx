@@ -128,6 +128,15 @@ export default function TasksPage() {
     load();
   }
 
+  async function editReworkReason(taskId: string, reason: string) {
+    await fetch(`/api/tasks/${taskId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updateReworkReason: reason }),
+    });
+    load();
+  }
+
   async function approveTask(taskId: string) {
     await fetch(`/api/tasks/${taskId}/status`, {
       method: "PATCH",
@@ -281,6 +290,7 @@ export default function TasksPage() {
           permissions={permissions}
           onStatusChange={changeStatus}
           onMarkRework={markRework}
+          onEditReworkReason={editReworkReason}
           onRemoveRework={removeRework}
           onApprove={approveTask}
           currentUserId={currentUser?.id}
@@ -301,6 +311,7 @@ export default function TasksPage() {
               permissions={permissions}
               onStatusChange={changeStatus}
               onMarkRework={markRework}
+          onEditReworkReason={editReworkReason}
               onRemoveRework={removeRework}
               onApprove={approveTask}
               currentUserId={currentUser?.id}
