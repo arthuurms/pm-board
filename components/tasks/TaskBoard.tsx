@@ -7,7 +7,7 @@ interface Props {
   tasks: Task[];
   permissions: Record<string, boolean>;
   onStatusChange: (taskId: string, newStatus: string) => void;
-  onMarkRework: (taskId: string) => void;
+  onMarkRework: (taskId: string, reason: string) => void;
   onRemoveRework: (taskId: string) => void;
   onApprove?: (taskId: string) => void;
   currentUserId?: string;

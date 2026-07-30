@@ -87,18 +87,25 @@ export default function TaskDetail({ task, onClose }: Props) {
 
           {/* Rework count banner */}
           {task.reworkCount > 0 && (
-            <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5">
-              <RotateCcw className="w-4 h-4 text-orange-500 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-orange-800">
-                  {task.reworkCount}× enviada para retrabalho
-                </p>
-                <p className="text-xs text-orange-600">
-                  {task.reworkCount === 1
-                    ? "Esta tarefa precisou de 1 correção"
-                    : `Esta tarefa precisou de ${task.reworkCount} correções`}
-                </p>
+            <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2.5">
+              <div className="flex items-center gap-3">
+                <RotateCcw className="w-4 h-4 text-orange-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-orange-800">
+                    {task.reworkCount}× enviada para retrabalho
+                  </p>
+                  <p className="text-xs text-orange-600">
+                    {task.reworkCount === 1
+                      ? "Esta tarefa precisou de 1 correção"
+                      : `Esta tarefa precisou de ${task.reworkCount} correções`}
+                  </p>
+                </div>
               </div>
+              {task.reworkReason && (
+                <p className="text-xs text-orange-800 bg-white/60 rounded-lg px-3 py-2 mt-2">
+                  <span className="font-semibold">Motivo:</span> {task.reworkReason}
+                </p>
+              )}
             </div>
           )}
 

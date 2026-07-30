@@ -36,6 +36,7 @@ export interface Task {
   status: TaskStatus;
   isRework: boolean;
   reworkCount: number;
+  reworkReason?: string | null;
   onTime?: boolean | null;
   approved: boolean;
   approvedAt?: string | null;

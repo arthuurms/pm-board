@@ -9,7 +9,7 @@ interface Props {
   task: Task;
   permissions: Record<string, boolean>;
   onStatusChange: (taskId: string, newStatus: string) => void;
-  onMarkRework: (taskId: string) => void;
+  onMarkRework: (taskId: string, reason: string) => void;
   onRemoveRework: (taskId: string) => void;
   onApprove?: (taskId: string) => void;
   currentUserId?: string;
@@ -37,9 +37,17 @@ function fmtDateTime(d: string) {
 // Inline confirmation dialog component
 function ConfirmRework({ taskTitle, onConfirm, onCancel }: {
   taskTitle: string;
-  onConfirm: () => void;
+  onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState(false);
+
+  function handleConfirm() {
+    if (!reason.trim()) { setError(true); return; }
+    onConfirm(reason.trim());
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onCancel}>
       <div
@@ -60,10 +68,25 @@ function ConfirmRework({ taskTitle, onConfirm, onCancel }: {
         <p className="text-sm text-gray-600 mb-1">
           Confirma que a tarefa abaixo precisará de correção?
         </p>
-        <p className="text-sm font-medium text-gray-800 bg-gray-50 rounded-lg px-3 py-2 mb-4 truncate">
+        <p className="text-sm font-medium text-gray-800 bg-gray-50 rounded-lg px-3 py-2 mb-3 truncate">
           {taskTitle}
         </p>
-        <div className="flex gap-2">
+        <label className="block text-xs font-medium text-gray-700 mb-1">
+          Motivo do retrabalho *
+        </label>
+        <textarea
+          className={clsx(
+            "w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 mb-1",
+            error && "border-red-400"
+          )}
+          rows={3}
+          placeholder="Ex: faltou ajustar a página do Aire"
+          value={reason}
+          onChange={e => { setReason(e.target.value); setError(false); }}
+          autoFocus
+        />
+        {error && <p className="text-xs text-red-600 mb-2">Descreva o motivo antes de confirmar.</p>}
+        <div className="flex gap-2 mt-3">
           <button
             onClick={onCancel}
             className="flex-1 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 transition-colors"
@@ -71,7 +94,7 @@ function ConfirmRework({ taskTitle, onConfirm, onCancel }: {
             Cancelar
           </button>
           <button
-            onClick={onConfirm}
+            onClick={handleConfirm}
             className="flex-1 px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
           >
             Confirmar retrabalho
@@ -99,9 +122,9 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
     setShowConfirm(true);
   }
 
-  function handleConfirm() {
+  function handleConfirm(reason: string) {
     setShowConfirm(false);
-    onMarkRework(task.id);
+    onMarkRework(task.id, reason);
   }
 
   return (
@@ -146,6 +169,13 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
             </span>
           )}
         </div>
+
+        {task.isRework && task.reworkReason && (
+          <div className="flex items-start gap-1.5 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 mb-2">
+            <RotateCcw className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-orange-800"><span className="font-semibold">Motivo:</span> {task.reworkReason}</p>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mb-2">
           <span className="flex items-center gap-1">

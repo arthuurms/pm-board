@@ -86,8 +86,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.addRework === true) {
     const allowed = await hasPermission(userId, "mark_rework");
     if (!allowed) return NextResponse.json({ error: "Sem permissão para marcar como retrabalho" }, { status: 403 });
+    const reworkReason: string | undefined = body.reworkReason;
     updateData.isRework = true;
     updateData.reworkCount = { increment: 1 };
+    updateData.reworkReason = reworkReason || null;
     // Move task back to pending and clear completion data
     updateData.status = "pending";
     updateData.completedAt = null;
@@ -101,7 +103,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         toStatus: "pending",
         changedById: userId,
         changedAt: now,
-        note: "Retrabalho registrado",
+        note: reworkReason ? `Retrabalho: ${reworkReason}` : "Retrabalho registrado",
       },
     });
   }
@@ -127,8 +129,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (task.reworkCount > 0) {
       const newCount = task.reworkCount - 1;
       updateData.reworkCount = newCount;
-      // Clear the rework flag when count reaches zero
-      if (newCount === 0) updateData.isRework = false;
+      // Clear the rework flag (and its reason) when count reaches zero
+      if (newCount === 0) {
+        updateData.isRework = false;
+        updateData.reworkReason = null;
+      }
     }
   }
 

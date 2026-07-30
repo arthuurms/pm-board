@@ -86,10 +86,10 @@ export default function CompletedPage() {
     load();
   }
 
-  async function markRework(taskId: string) {
+  async function markRework(taskId: string, reason: string) {
     await fetch(`/api/tasks/${taskId}/status`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ addRework: true }),
+      body: JSON.stringify({ addRework: true, reworkReason: reason }),
     });
     load();
   }
