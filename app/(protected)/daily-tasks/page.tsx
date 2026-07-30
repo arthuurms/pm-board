@@ -121,10 +121,12 @@ export default function DailyTasksPage() {
   // with stale (e.g. unfiltered) data.
   const loadSeq = useRef(0);
 
-  const load = useCallback(async () => {
+  // `silent` skips the loading-spinner state, used for the background
+  // auto-refresh so it doesn't unmount the list while someone is mid-edit.
+  const load = useCallback(async (silent = false) => {
     if (!currentUser?.id) return;
     const seq = ++loadSeq.current;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const params = new URLSearchParams();
     if (!isAdmin) params.set("assigneeId", currentUser.id);
     else if (filterUser) params.set("assigneeId", filterUser);
@@ -132,7 +134,7 @@ export default function DailyTasksPage() {
     const data = await res.json();
     if (seq !== loadSeq.current) return;
     setTasks(data);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [isAdmin, currentUser?.id, filterUser]);
 
   useEffect(() => { load(); }, [load]);
@@ -140,7 +142,7 @@ export default function DailyTasksPage() {
   // Auto-refresh so newly created/checked-off daily tasks show up without a
   // manual reload.
   useEffect(() => {
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(() => load(true), 15000);
     return () => clearInterval(interval);
   }, [load]);
 

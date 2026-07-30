@@ -24,21 +24,24 @@ export default function ReworkPage() {
     fetch(`/api/users/${userId}/permissions`).then((r) => r.json()).then(setPermissions);
   }, [userId]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // `silent` skips the loading-spinner state, used for the background
+  // auto-refresh so it doesn't unmount the task list (and any dialog open
+  // inside a card, e.g. the rework-reason form) while someone is mid-edit.
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const params = new URLSearchParams({ isRework: "true" });
     if (filterUser) params.set("assigneeId", filterUser);
     if (filterMonth) params.set("month", filterMonth);
     const res = await fetch(`/api/tasks?${params}`);
     setTasks(await res.json());
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [filterUser, filterMonth]);
 
   useEffect(() => { load(); }, [load]);
 
   // Auto-refresh so newly reworked tasks show up without a manual reload.
   useEffect(() => {
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(() => load(true), 15000);
     return () => clearInterval(interval);
   }, [load]);
 

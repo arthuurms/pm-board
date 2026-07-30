@@ -39,24 +39,26 @@ export default function MetasPage() {
   // with stale (e.g. unfiltered) data.
   const loadSeq = useRef(0);
 
-  const load = useCallback(async () => {
+  // `silent` skips the loading-spinner state, used for the background
+  // auto-refresh so it doesn't unmount the list while someone is mid-edit.
+  const load = useCallback(async (silent = false) => {
     if (!currentUser?.id) return;
     const seq = ++loadSeq.current;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const params = new URLSearchParams();
     if (isAdmin && filterUser) params.set("assigneeId", filterUser);
     const res = await fetch(`/api/goals?${params}`);
     const data = await res.json();
     if (seq !== loadSeq.current) return;
     setGoals(data);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [currentUser?.id, isAdmin, filterUser]);
 
   useEffect(() => { load(); }, [load]);
 
   // Auto-refresh so goals created/updated elsewhere show up without a manual reload.
   useEffect(() => {
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(() => load(true), 15000);
     return () => clearInterval(interval);
   }, [load]);
 

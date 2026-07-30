@@ -62,10 +62,13 @@ export default function CompletedPage() {
   // with stale (e.g. unfiltered) data.
   const loadSeq = useRef(0);
 
-  const load = useCallback(async () => {
+  // `silent` skips the loading-spinner state, used for the background
+  // auto-refresh so it doesn't unmount the task list (and any dialog open
+  // inside a card, e.g. the rework-reason form) while someone is mid-edit.
+  const load = useCallback(async (silent = false) => {
     if (!currentUser?.id) return;
     const seq = ++loadSeq.current;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const params = new URLSearchParams({ status: "completed" });
     if (canViewAll && filterUser) params.set("assigneeId", filterUser);
     if (filterMonth) params.set("month", filterMonth);
@@ -74,14 +77,14 @@ export default function CompletedPage() {
     const data = await res.json();
     if (seq !== loadSeq.current) return;
     setTasks(data);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [currentUser?.id, canViewAll, filterUser, filterMonth, filterDays]);
 
   useEffect(() => { load(); }, [load]);
 
   // Auto-refresh so newly completed tasks show up without a manual reload.
   useEffect(() => {
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(() => load(true), 15000);
     return () => clearInterval(interval);
   }, [load]);
 

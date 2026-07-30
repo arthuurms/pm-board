@@ -70,10 +70,13 @@ export default function TasksPage() {
   // silently overwrite it with stale (e.g. unfiltered) data.
   const loadSeq = useRef(0);
 
-  const load = useCallback(async () => {
+  // `silent` skips the loading-spinner state, used for the background
+  // auto-refresh so it doesn't unmount the task list (and any dialog open
+  // inside a card, e.g. the rework-reason form) while someone is mid-edit.
+  const load = useCallback(async (silent = false) => {
     if (!currentUser?.id) return;
     const seq = ++loadSeq.current;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const params = new URLSearchParams();
 
     if (canViewAll && filterUser) {
@@ -86,7 +89,7 @@ export default function TasksPage() {
     const data = await res.json();
     if (seq !== loadSeq.current) return; // a newer request has since started
     setTasks(data);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [currentUser?.id, canViewAll, filterUser, filterPriority]);
 
   useEffect(() => { load(); }, [load]);
@@ -94,7 +97,7 @@ export default function TasksPage() {
   // Auto-refresh so tasks created/updated elsewhere (e.g. by another person,
   // or via the MCP integration) show up without a manual page reload.
   useEffect(() => {
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(() => load(true), 15000);
     return () => clearInterval(interval);
   }, [load]);
 
