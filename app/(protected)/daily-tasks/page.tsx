@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { User } from "@/types";
 import { PriorityBadge } from "@/components/ui/Badge";
@@ -115,18 +115,34 @@ export default function DailyTasksPage() {
     });
   }, [isAdmin, currentUser?.id]);
 
+  // Guards against out-of-order responses: filters can change rapidly right
+  // after mount (e.g. the saved person filter restoring), and without this an
+  // older in-flight request could resolve after a newer one and overwrite it
+  // with stale (e.g. unfiltered) data.
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
     if (!currentUser?.id) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     const params = new URLSearchParams();
     if (!isAdmin) params.set("assigneeId", currentUser.id);
     else if (filterUser) params.set("assigneeId", filterUser);
     const res = await fetch(`/api/daily-tasks?${params}`);
-    setTasks(await res.json());
+    const data = await res.json();
+    if (seq !== loadSeq.current) return;
+    setTasks(data);
     setLoading(false);
   }, [isAdmin, currentUser?.id, filterUser]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh so newly created/checked-off daily tasks show up without a
+  // manual reload.
+  useEffect(() => {
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   async function toggleComplete(taskId: string) {
     await fetch(`/api/daily-tasks/${taskId}`, {

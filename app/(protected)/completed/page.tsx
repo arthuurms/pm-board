@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Task, User } from "@/types";
 import TaskCard from "@/components/tasks/TaskCard";
@@ -56,19 +56,34 @@ export default function CompletedPage() {
   const isAdmin = currentUser?.role === "admin";
   const canViewAll = isAdmin || permissions.view_all_tasks;
 
+  // Guards against out-of-order responses: filters can change rapidly right
+  // after mount (e.g. the saved person filter restoring), and without this an
+  // older in-flight request could resolve after a newer one and overwrite it
+  // with stale (e.g. unfiltered) data.
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
     if (!currentUser?.id) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     const params = new URLSearchParams({ status: "completed" });
     if (canViewAll && filterUser) params.set("assigneeId", filterUser);
     if (filterMonth) params.set("month", filterMonth);
     else if (filterDays) params.set("days", filterDays);
     const res = await fetch(`/api/tasks?${params}`);
-    setTasks(await res.json());
+    const data = await res.json();
+    if (seq !== loadSeq.current) return;
+    setTasks(data);
     setLoading(false);
   }, [currentUser?.id, canViewAll, filterUser, filterMonth, filterDays]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh so newly completed tasks show up without a manual reload.
+  useEffect(() => {
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   async function changeStatus(taskId: string, newStatus: string) {
     await fetch(`/api/tasks/${taskId}/status`, {

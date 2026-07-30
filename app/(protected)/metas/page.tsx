@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Goal, User } from "@/types";
 import { Target, Plus, Check, X, Pencil, Trash2 } from "lucide-react";
@@ -33,17 +33,32 @@ export default function MetasPage() {
     else localStorage.removeItem("clickfy:metas:filterUser");
   }, [filterUser]);
 
+  // Guards against out-of-order responses: filters can change rapidly right
+  // after mount (e.g. the saved person filter restoring), and without this an
+  // older in-flight request could resolve after a newer one and overwrite it
+  // with stale (e.g. unfiltered) data.
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
     if (!currentUser?.id) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     const params = new URLSearchParams();
     if (isAdmin && filterUser) params.set("assigneeId", filterUser);
     const res = await fetch(`/api/goals?${params}`);
-    setGoals(await res.json());
+    const data = await res.json();
+    if (seq !== loadSeq.current) return;
+    setGoals(data);
     setLoading(false);
   }, [currentUser?.id, isAdmin, filterUser]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-refresh so goals created/updated elsewhere show up without a manual reload.
+  useEffect(() => {
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   function openCreate() {
     setForm({ title: "", description: "", assigneeId: filterUser || users[0]?.id || "" });

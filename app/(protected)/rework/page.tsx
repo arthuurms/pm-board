@@ -36,6 +36,12 @@ export default function ReworkPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Auto-refresh so newly reworked tasks show up without a manual reload.
+  useEffect(() => {
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
+  }, [load]);
+
   async function changeStatus(taskId: string, newStatus: string) {
     await fetch(`/api/tasks/${taskId}/status`, {
       method: "PATCH",
