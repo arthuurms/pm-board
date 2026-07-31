@@ -14,6 +14,7 @@ interface PerformanceData {
   summary: {
     totalCompleted: number;
     reworkCount: number;
+    reworkEvents: number;
     onTimeCount: number;
     lateCount: number;
     reworkRate: number;
@@ -287,7 +288,7 @@ export default function PerformancePage() {
                 <p className="text-xs text-gray-400 mt-0.5">Fora do prazo</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-orange-500">{data.summary.reworkCount}</p>
+                <p className="text-2xl font-bold text-orange-500">{data.summary.reworkEvents}</p>
                 <p className="text-xs text-gray-400 mt-0.5">Retrabalhos</p>
               </div>
             </div>

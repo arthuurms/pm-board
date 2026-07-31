@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   const [allTasks, allIncidents, user] = await Promise.all([
     prisma.task.findMany({
       where: { assigneeId: userId, completedAt: { gte: windowStart, lt: windowEnd }, status: "completed" },
-      select: { isRework: true, onTime: true, completedAt: true, dueDate: true, startedAt: true, priority: true },
+      select: { isRework: true, reworkCount: true, onTime: true, completedAt: true, dueDate: true, startedAt: true, priority: true },
     }),
     prisma.incident.findMany({
       where: { relatedUserId: userId, occurredAt: { gte: windowStart, lt: windowEnd } },
@@ -48,6 +48,10 @@ export async function GET(req: NextRequest) {
   // --- Aggregate metrics ---
   const total = allTasks.length;
   const reworkCount = allTasks.filter((t) => t.isRework).length;
+  // Distinct from reworkCount above (tasks that needed rework at least once) —
+  // this sums how many times rework happened in total, since one task can
+  // bounce back and forth several times.
+  const reworkEvents = allTasks.reduce((sum, t) => sum + t.reworkCount, 0);
   const onTimeCount = allTasks.filter((t) => t.onTime === true).length;
   const lateCount = allTasks.filter((t) => t.onTime === false).length;
 
@@ -129,6 +133,7 @@ export async function GET(req: NextRequest) {
     summary: {
       totalCompleted: total,
       reworkCount,
+      reworkEvents,
       onTimeCount,
       lateCount,
       reworkRate,
