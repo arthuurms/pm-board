@@ -232,6 +232,97 @@ const mcpHandler = createMcpHandler(
     );
 
     server.registerTool(
+      "marcar_retrabalho",
+      {
+        title: "Marcar retrabalho",
+        description: "Marca uma tarefa (concluída ou não) como retrabalho, com o motivo, movendo-a de volta para pendente.",
+        inputSchema: {
+          titulo: z.string().describe("Título (ou parte dele) da tarefa"),
+          responsavel: z.string().optional().describe("Nome do responsável, para desempatar quando mais de uma tarefa tem título parecido"),
+          motivo: z.string().describe("Motivo do retrabalho, mostrado para quem executa a tarefa"),
+          marcadoPor: z.string().describe("Nome de quem está marcando o retrabalho"),
+        },
+      },
+      async ({ titulo, responsavel, motivo, marcadoPor }) => {
+        let assigneeFilter: string | undefined;
+        if (responsavel) {
+          const assignee = await resolveUser(responsavel);
+          if (!assignee) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Não encontrei ninguém chamado "${responsavel}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }],
+            };
+          }
+          assigneeFilter = assignee.id;
+        }
+
+        const marcador = await resolveUser(marcadoPor);
+        if (!marcador) {
+          const users = await prisma.user.findMany({ select: { name: true } });
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Não encontrei ninguém chamado "${marcadoPor}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }],
+          };
+        }
+
+        const candidates = await prisma.task.findMany({
+          where: {
+            title: { contains: titulo, mode: "insensitive" },
+            ...(assigneeFilter ? { assigneeId: assigneeFilter } : {}),
+          },
+          include: { assignee: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+        });
+
+        if (candidates.length === 0) {
+          return { isError: true, content: [{ type: "text", text: `Nenhuma tarefa encontrada com "${titulo}" no título.` }] };
+        }
+        if (candidates.length > 1) {
+          const lines = candidates.map((t) => `- "${t.title}" (responsável: ${t.assignee.name})`);
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Mais de uma tarefa encontrada com "${titulo}" — seja mais específico:\n${lines.join("\n")}` }],
+          };
+        }
+
+        const task = candidates[0];
+        const now = new Date();
+        const updated = await prisma.task.update({
+          where: { id: task.id },
+          data: {
+            isRework: true,
+            reworkCount: { increment: 1 },
+            reworkReason: motivo,
+            status: "pending",
+            completedAt: null,
+            onTime: null,
+            approved: false,
+            approvedAt: null,
+          },
+          include: { assignee: { select: { name: true } } },
+        });
+        await prisma.statusHistory.create({
+          data: {
+            taskId: task.id,
+            fromStatus: task.status,
+            toStatus: "pending",
+            changedById: marcador.id,
+            changedAt: now,
+            note: `Retrabalho: ${motivo}`,
+          },
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: `Tarefa "${updated.title}" marcada como retrabalho (${updated.reworkCount}ª vez) para ${updated.assignee.name}. Motivo: ${motivo}`,
+          }],
+        };
+      }
+    );
+
+    server.registerTool(
       "listar_tags",
       {
         title: "Listar tags",
