@@ -28,10 +28,10 @@ export async function GET(req: NextRequest) {
   const windowEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
   // Fetch all data in the window
-  const [allTasks, allIncidents, user] = await Promise.all([
+  const [allTasks, allIncidents, user, reworkEvents] = await Promise.all([
     prisma.task.findMany({
       where: { assigneeId: userId, completedAt: { gte: windowStart, lt: windowEnd }, status: "completed" },
-      select: { isRework: true, reworkCount: true, onTime: true, completedAt: true, dueDate: true, startedAt: true, priority: true },
+      select: { isRework: true, onTime: true, completedAt: true, dueDate: true, startedAt: true, priority: true },
     }),
     prisma.incident.findMany({
       where: { relatedUserId: userId, occurredAt: { gte: windowStart, lt: windowEnd } },
@@ -41,6 +41,17 @@ export async function GET(req: NextRequest) {
       where: { id: userId },
       select: { id: true, name: true, email: true, position: true, role: true },
     }),
+    // Counted from the moment each rework happened (statusHistory), not from
+    // completedAt — a task still sitting in rework today (not yet redelivered)
+    // would otherwise be invisible to this metric until it's completed again.
+    prisma.statusHistory.count({
+      where: {
+        task: { assigneeId: userId },
+        toStatus: "pending",
+        note: { startsWith: "Retrabalho" },
+        changedAt: { gte: windowStart, lt: windowEnd },
+      },
+    }),
   ]);
 
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -48,10 +59,6 @@ export async function GET(req: NextRequest) {
   // --- Aggregate metrics ---
   const total = allTasks.length;
   const reworkCount = allTasks.filter((t) => t.isRework).length;
-  // Distinct from reworkCount above (tasks that needed rework at least once) —
-  // this sums how many times rework happened in total, since one task can
-  // bounce back and forth several times.
-  const reworkEvents = allTasks.reduce((sum, t) => sum + t.reworkCount, 0);
   const onTimeCount = allTasks.filter((t) => t.onTime === true).length;
   const lateCount = allTasks.filter((t) => t.onTime === false).length;
 
