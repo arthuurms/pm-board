@@ -215,10 +215,18 @@ const mcpHandler = createMcpHandler(
           data.tagId = tag.id;
         }
 
-        const updated = await prisma.task.update({ where: { id: candidates[0].id }, data });
+        const updated = await prisma.task.update({
+          where: { id: candidates[0].id },
+          data,
+          include: { assignee: { select: { name: true } }, creator: { select: { name: true } }, tag: true },
+        });
         const dueDateLabel = updated.dueDate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+        const tagLabel = updated.tag ? ` | tag: ${updated.tag.name}` : "";
         return {
-          content: [{ type: "text", text: `Tarefa "${updated.title}" atualizada. Prazo: ${dueDateLabel}, prioridade: ${updated.priority}.` }],
+          content: [{
+            type: "text",
+            text: `Tarefa "${updated.title}" atualizada.${updated.description ? ` — ${updated.description}` : ""} | responsável: ${updated.assignee.name} | solicitado por: ${updated.creator.name} | prazo: ${dueDateLabel} | prioridade: ${updated.priority} | status: ${updated.status}${tagLabel}`,
+          }],
         };
       }
     );
