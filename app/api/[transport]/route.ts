@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
 const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
+const INCIDENT_CATEGORY_VALUES = ["ops_down", "service_failure", "revenue_loss"] as const;
+const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"] as const;
 
 function normalize(text: string): string {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -317,6 +319,66 @@ const mcpHandler = createMcpHandler(
           content: [{
             type: "text",
             text: `Tarefa "${updated.title}" marcada como retrabalho (${updated.reworkCount}ª vez) para ${updated.assignee.name}. Motivo: ${motivo}`,
+          }],
+        };
+      }
+    );
+
+    server.registerTool(
+      "criar_incidencia",
+      {
+        title: "Criar incidência",
+        description: "Registra uma incidência no Clickfy (ex: página derrubada com campanhas ativas, falha de serviço, perda de receita), opcionalmente relacionada a uma pessoa.",
+        inputSchema: {
+          titulo: z.string().describe("Título da incidência"),
+          descricao: z.string().optional().describe("Descrição detalhada do que aconteceu"),
+          categoria: z.enum(INCIDENT_CATEGORY_VALUES).describe("ops_down (serviço fora do ar), service_failure (falha de serviço) ou revenue_loss (perda de receita)"),
+          severidade: z.enum(INCIDENT_SEVERITY_VALUES).describe("low, medium, high ou critical"),
+          relacionadoA: z.string().optional().describe("Nome da pessoa relacionada à incidência (opcional)"),
+          reportadoPor: z.string().describe("Nome de quem está reportando a incidência"),
+          ocorreuEm: z.string().optional().describe("Data/hora em que ocorreu, formato YYYY-MM-DDTHH:mm horário de Brasília (padrão: agora)"),
+        },
+      },
+      async ({ titulo, descricao, categoria, severidade, relacionadoA, reportadoPor, ocorreuEm }) => {
+        const reporter = await resolveUser(reportadoPor);
+        if (!reporter) {
+          const users = await prisma.user.findMany({ select: { name: true } });
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Não encontrei ninguém chamado "${reportadoPor}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }],
+          };
+        }
+
+        let relatedUserId: string | undefined;
+        if (relacionadoA) {
+          const related = await resolveUser(relacionadoA);
+          if (!related) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Não encontrei ninguém chamado "${relacionadoA}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }],
+            };
+          }
+          relatedUserId = related.id;
+        }
+
+        const incident = await prisma.incident.create({
+          data: {
+            title: titulo,
+            description: descricao || null,
+            category: categoria,
+            severity: severidade,
+            occurredAt: ocorreuEm ? parseBrasiliaDateTime(ocorreuEm) : new Date(),
+            reportedById: reporter.id,
+            relatedUserId: relatedUserId || null,
+          },
+        });
+
+        const occurredLabel = incident.occurredAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+        return {
+          content: [{
+            type: "text",
+            text: `Incidência "${incident.title}" registrada (categoria: ${incident.category}, severidade: ${incident.severity}, ocorreu em: ${occurredLabel}).`,
           }],
         };
       }
