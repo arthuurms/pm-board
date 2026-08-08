@@ -10,7 +10,7 @@ import clsx from "clsx";
 
 interface PerformanceData {
   user: { id: string; name: string; email: string; position?: string | null; role: string };
-  period: { months: number; start: string; end: string };
+  period: { months: number; month: string | null; start: string; end: string; label: string };
   summary: {
     totalCompleted: number;
     reworkCount: number;
@@ -71,6 +71,11 @@ export default function PerformancePage() {
   const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [months, setMonths] = useState(3);
+  const [filterMode, setFilterMode] = useState<"window" | "month">("window");
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -86,10 +91,14 @@ export default function PerformancePage() {
   const load = useCallback(async () => {
     if (!selectedUserId) return;
     setLoading(true);
-    const res = await fetch(`/api/performance?userId=${selectedUserId}&months=${months}`);
+    const query =
+      filterMode === "month"
+        ? `userId=${selectedUserId}&month=${selectedMonth}`
+        : `userId=${selectedUserId}&months=${months}`;
+    const res = await fetch(`/api/performance?${query}`);
     if (res.ok) setData(await res.json());
     setLoading(false);
-  }, [selectedUserId, months]);
+  }, [selectedUserId, months, filterMode, selectedMonth]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -118,17 +127,41 @@ export default function PerformancePage() {
           </div>
         )}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Período</label>
+          <label className="block text-xs text-gray-500 mb-1">Tipo de período</label>
           <select
             className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            value={months}
-            onChange={(e) => setMonths(Number(e.target.value))}
+            value={filterMode}
+            onChange={(e) => setFilterMode(e.target.value as "window" | "month")}
           >
-            <option value={1}>Último mês</option>
-            <option value={3}>Últimos 3 meses</option>
-            <option value={6}>Últimos 6 meses</option>
+            <option value="window">Janela rolante</option>
+            <option value="month">Mês específico</option>
           </select>
         </div>
+        {filterMode === "window" ? (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Período</label>
+            <select
+              className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              value={months}
+              onChange={(e) => setMonths(Number(e.target.value))}
+            >
+              <option value={1}>Último mês</option>
+              <option value={3}>Últimos 3 meses</option>
+              <option value={6}>Últimos 6 meses</option>
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Mês</label>
+            <input
+              type="month"
+              className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              value={selectedMonth}
+              max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       {loading && <p className="text-sm text-gray-400 text-center py-16">Analisando desempenho...</p>}
@@ -148,7 +181,7 @@ export default function PerformancePage() {
               {data.user.position && <p className="text-sm text-gray-500 mt-0.5">{data.user.position}</p>}
               <p className="text-sm text-gray-600 mt-2">{data.classReason}</p>
               <p className="text-xs text-gray-400 mt-1">
-                Baseado em {data.summary.totalCompleted} tarefa(s) concluída(s) nos últimos {data.period.months} mês(es)
+                Baseado em {data.summary.totalCompleted} tarefa(s) concluída(s) — {data.period.label}
               </p>
             </div>
           </div>
@@ -273,7 +306,7 @@ export default function PerformancePage() {
 
           {/* Stats summary row */}
           <div className="bg-slate-50 border rounded-xl p-5">
-            <p className="text-sm font-semibold text-gray-700 mb-3">Resumo do período ({data.period.months} meses)</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3">Resumo do período ({data.period.label})</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold text-gray-900">{data.summary.totalCompleted}</p>

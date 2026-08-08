@@ -5,8 +5,11 @@ import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/performance?userId=...&months=6
+ * GET /api/performance?userId=...&month=2026-08
  *
- * Returns a full performance analysis for a given user over the last N months.
+ * Returns a full performance analysis for a given user, either over a rolling
+ * window of the last N months, or over one specific calendar month — capped
+ * at "now" when that month is the current one (so it never counts future days).
  *
  * Classification logic:
  *   BOA QUALIDADE  (green):  slaRate >= 85 AND reworkRate <= 10 AND incidents <= 1
@@ -19,13 +22,39 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get("userId");
-  const months = parseInt(searchParams.get("months") || "3", 10);
+  const monthParam = searchParams.get("month"); // "YYYY-MM"
 
   if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
 
   const now = new Date();
-  const windowStart = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
-  const windowEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  let windowStart: Date;
+  let windowEnd: Date;
+  let months: number;
+  let trendMonths: number;
+  let periodLabel: string;
+  let trendAnchor: Date;
+
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [y, m] = monthParam.split("-").map(Number);
+    const selected = new Date(y, m - 1, 1);
+    const isCurrentMonth = selected.getFullYear() === now.getFullYear() && selected.getMonth() === now.getMonth();
+
+    windowStart = selected;
+    windowEnd = isCurrentMonth ? now : new Date(y, m, 1);
+    months = 1;
+    trendMonths = 6; // still show 6 months of history around the selected month
+    trendAnchor = selected;
+    periodLabel = isCurrentMonth
+      ? `${fmtDay(windowStart)} – ${fmtDay(windowEnd)}`
+      : selected.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  } else {
+    months = parseInt(searchParams.get("months") || "3", 10);
+    windowStart = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+    windowEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    trendMonths = months;
+    trendAnchor = now;
+    periodLabel = months === 1 ? "último mês" : `últimos ${months} meses`;
+  }
 
   // Fetch all data in the window
   const [allTasks, allIncidents, user, reworkEvents] = await Promise.all([
@@ -114,7 +143,7 @@ export async function GET(req: NextRequest) {
   }, {});
 
   // --- Monthly trend for the window ---
-  const trend = await buildTrend(userId, months);
+  const trend = await buildTrend(userId, trendMonths, trendAnchor);
 
   // --- Strengths and weaknesses ---
   const strengths: string[] = [];
@@ -136,7 +165,13 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     user,
-    period: { months, start: windowStart.toISOString(), end: windowEnd.toISOString() },
+    period: {
+      months,
+      month: monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : null,
+      start: windowStart.toISOString(),
+      end: windowEnd.toISOString(),
+      label: periodLabel,
+    },
     summary: {
       totalCompleted: total,
       reworkCount,
@@ -162,6 +197,10 @@ export async function GET(req: NextRequest) {
 
 function round(n: number) { return Math.round(n * 10) / 10; }
 
+function fmtDay(d: Date) {
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 function buildLowReason(sla: number, rework: number, incidents: number): string {
   const issues = [];
   if (sla < 65) issues.push(`SLA baixo (${sla}%)`);
@@ -170,11 +209,10 @@ function buildLowReason(sla: number, rework: number, incidents: number): string 
   return issues.join(", ");
 }
 
-async function buildTrend(userId: string, months: number) {
-  const now = new Date();
+async function buildTrend(userId: string, months: number, anchor: Date) {
   const results = [];
   for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1);
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
     const label = d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
