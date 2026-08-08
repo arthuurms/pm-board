@@ -1,6 +1,7 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { verifyAccessToken } from "@/lib/oauth";
 
 const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
 const INCIDENT_CATEGORY_VALUES = ["ops_down", "service_failure", "revenue_loss"] as const;
@@ -418,10 +419,24 @@ const mcpHandler = createMcpHandler(
 const authHandler = withMcpAuth(
   mcpHandler,
   async (_req, bearerToken) => {
-    if (!bearerToken || bearerToken !== process.env.MCP_API_KEY) return undefined;
-    return { token: bearerToken, clientId: "clickfy", scopes: ["tasks:write"] };
+    if (!bearerToken) return undefined;
+
+    // Static service key — used by internal/legacy integrations.
+    if (bearerToken === process.env.MCP_API_KEY) {
+      return { token: bearerToken, clientId: "clickfy-service", scopes: ["tasks:write"] };
+    }
+
+    // OAuth access token issued via /api/oauth/token, tied to a logged-in user.
+    const claims = verifyAccessToken(bearerToken);
+    if (!claims) return undefined;
+    return {
+      token: bearerToken,
+      clientId: claims.cid,
+      scopes: ["tasks:write"],
+      extra: { userId: claims.sub },
+    };
   },
-  { required: true }
+  { required: true, resourceMetadataPath: "/.well-known/oauth-protected-resource" }
 );
 
 export { authHandler as GET, authHandler as POST, authHandler as DELETE };

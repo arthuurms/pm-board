@@ -154,3 +154,37 @@ model UserPermission {
 
   @@unique([userId, action])
 }
+
+// OAuth 2.0 clients registered via Dynamic Client Registration (RFC 7591),
+// e.g. Claude / ChatGPT apps connecting to the Clickfy MCP server.
+model OAuthClient {
+  id           String   @id @default(cuid())
+  clientId     String   @unique
+  clientName   String?
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+}
+
+// Short-lived code issued after login+consent, exchanged once for an access token.
+model OAuthAuthorizationCode {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  clientId            String
+  redirectUri         String
+  userId              String
+  codeChallenge       String
+  codeChallengeMethod String
+  scope               String?
+  expiresAt           DateTime
+  createdAt           DateTime @default(now())
+}
+
+// Refresh tokens stored hashed (never the raw value) so a DB read can't leak a usable token.
+model OAuthRefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  clientId  String
+  userId    String
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+}

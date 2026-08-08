@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "clickfy": {
+      "type": "http",
+      "url": "https://pm-board-indol.vercel.app/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CLICKFY_API_KEY:-}"
+      }
+    }
+  }
+}
