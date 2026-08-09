@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Incident, User } from "@/types";
 import { SeverityBadge, CategoryLabel } from "@/components/ui/Badge";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
 
 interface FormState {
   title: string;
@@ -23,6 +23,7 @@ export default function IncidentsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [showForm, setShowForm] = useState(false);
+  const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
   const [filterMonth, setFilterMonth] = useState("");
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Incident | null>(null);
@@ -50,18 +51,41 @@ export default function IncidentsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function openCreate() {
+    setEditingIncident(null);
+    setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
+    setFormError("");
+    setShowForm(true);
+  }
+
+  function openEdit(inc: Incident) {
+    setEditingIncident(inc);
+    setForm({
+      title: inc.title,
+      description: inc.description ?? "",
+      category: inc.category,
+      severity: inc.severity,
+      occurredAt: new Date(inc.occurredAt).toISOString().slice(0, 16),
+      relatedUserId: inc.relatedUserId ?? "",
+    });
+    setFormError("");
+    setShowForm(true);
+  }
+
   async function submitIncident(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setFormError("");
-    const res = await fetch("/api/incidents", {
-      method: "POST",
+    const url = editingIncident ? `/api/incidents/${editingIncident.id}` : "/api/incidents";
+    const res = await fetch(url, {
+      method: editingIncident ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...form, relatedUserId: form.relatedUserId || null }),
     });
     setSubmitting(false);
     if (!res.ok) { setFormError((await res.json()).error); return; }
     setShowForm(false);
+    setEditingIncident(null);
     setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
     load();
   }
@@ -87,7 +111,7 @@ export default function IncidentsPage() {
         </div>
         {permissions.create_incident && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={openCreate}
             className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
           >
             <Plus className="w-4 h-4" /> Registrar Incidente
@@ -113,6 +137,15 @@ export default function IncidentsPage() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <SeverityBadge severity={inc.severity} />
+                  {(isAdmin || inc.reportedBy.id === userId) && (
+                    <button
+                      onClick={() => openEdit(inc)}
+                      className="p-1.5 text-gray-300 hover:text-violet-500 hover:bg-violet-50 rounded transition-colors"
+                      title="Editar incidente"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
                   {isAdmin && (
                     <button
                       onClick={() => setDeleteTarget(inc)}
@@ -144,7 +177,7 @@ export default function IncidentsPage() {
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b"><h2 className="text-lg font-semibold">Registrar Incidente</h2></div>
+            <div className="px-6 py-4 border-b"><h2 className="text-lg font-semibold">{editingIncident ? "Editar Incidente" : "Registrar Incidente"}</h2></div>
             <form onSubmit={submitIncident} className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
@@ -195,9 +228,9 @@ export default function IncidentsPage() {
               </div>
               {formError && <p className="text-sm text-red-600">{formError}</p>}
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">Cancelar</button>
+                <button type="button" onClick={() => { setShowForm(false); setEditingIncident(null); }} className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50">Cancelar</button>
                 <button type="submit" disabled={submitting} className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-                  {submitting ? "Salvando..." : "Registrar"}
+                  {submitting ? "Salvando..." : editingIncident ? "Salvar" : "Registrar"}
                 </button>
               </div>
             </form>
