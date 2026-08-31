@@ -152,8 +152,8 @@ export default function QualidadePage() {
   if (permissionsLoaded && !canAccess) {
     return (
       <div className="p-6 max-w-2xl mx-auto text-center py-20">
-        <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500">Você não tem acesso a essa área. Peça a um admin para liberar a permissão &quot;Qualidade de Serviço&quot;.</p>
+        <ShieldAlert className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500">Você não tem acesso a essa área. Peça a um admin para liberar a permissão &quot;Qualidade de Serviço&quot;.</p>
       </div>
     );
   }
@@ -167,8 +167,8 @@ export default function QualidadePage() {
             <ShieldCheck className="w-5.5 h-5.5 text-white" strokeWidth={2.25} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Qualidade de Serviço</h1>
-            <p className="text-sm text-slate-500">Incidências de atendimento e pontos perdidos no bônus de qualidade</p>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Qualidade de Serviço</h1>
+            <p className="text-sm text-gray-500">Incidências de atendimento e pontos perdidos no bônus de qualidade</p>
           </div>
         </div>
         <button
@@ -182,7 +182,7 @@ export default function QualidadePage() {
       <div className="flex gap-3 mb-6">
         <input
           type="month"
-          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
           value={filterMonth}
           onChange={(e) => setFilterMonth(e.target.value)}
         />
@@ -198,57 +198,57 @@ export default function QualidadePage() {
                 key={id}
                 className={clsx(
                   "relative overflow-hidden rounded-xl border p-3.5 shadow-sm bg-white",
-                  critical ? "border-red-200" : warn ? "border-amber-200" : "border-slate-200"
+                  critical ? "border-red-200" : warn ? "border-red-200" : "border-gray-200"
                 )}
               >
                 <div
                   className={clsx(
                     "absolute inset-x-0 top-0 h-0.5",
-                    critical ? "bg-gradient-to-r from-red-500 to-rose-400" : warn ? "bg-gradient-to-r from-amber-500 to-orange-400" : "bg-gradient-to-r from-violet-500 to-cyan-400"
+                    critical ? "bg-gradient-to-r from-red-500 to-rose-400" : warn ? "bg-gradient-to-r from-red-500 to-orange-400" : "bg-gradient-to-r from-violet-500 to-cyan-400"
                   )}
                 />
-                <p className="text-xs font-medium text-slate-500 truncate">{t.name}</p>
-                <p className={clsx("text-xl font-bold tabular-nums tracking-tight mt-0.5", critical ? "text-red-600" : warn ? "text-amber-600" : "text-slate-900")}>
-                  {fmtPts(t.points)}<span className="text-xs font-medium text-slate-400 ml-1">pts</span>
+                <p className="text-xs font-medium text-gray-500 truncate">{t.name}</p>
+                <p className={clsx("text-xl font-bold tabular-nums tracking-tight mt-0.5", critical ? "text-red-600" : warn ? "text-red-600" : "text-gray-900")}>
+                  {fmtPts(t.points)}<span className="text-xs font-medium text-gray-400 ml-1">pts</span>
                 </p>
-                <p className="text-[11px] text-slate-400">perdidos no mês</p>
+                <p className="text-[11px] text-gray-400">perdidos no mês</p>
               </div>
             );
           })}
         </div>
       )}
 
-      {loading && <p className="text-sm text-slate-400 text-center py-12">Carregando...</p>}
+      {loading && <p className="text-sm text-gray-400 text-center py-12">Carregando...</p>}
       {!loading && incidents.length === 0 && (
-        <div className="text-center py-16 border border-dashed border-slate-200 rounded-2xl">
-          <Sparkles className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-400">Nenhuma incidência registrada nesse mês</p>
+        <div className="text-center py-16 border border-dashed border-gray-200 rounded-2xl">
+          <Sparkles className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-400">Nenhuma incidência registrada nesse mês</p>
         </div>
       )}
 
       {!loading && (
         <div className="space-y-3">
           {incidents.map((inc) => (
-            <div key={inc.id} className="group relative overflow-hidden bg-white rounded-xl border border-slate-200 pl-4 pr-4 py-4 shadow-sm hover:shadow-md hover:border-violet-200 transition-all">
-              <div className={clsx("absolute inset-y-0 left-0 w-1", inc.points >= 1 ? "bg-gradient-to-b from-amber-400 to-orange-500" : "bg-gradient-to-b from-amber-300 to-amber-400")} />
+            <div key={inc.id} className="group relative overflow-hidden bg-white rounded-xl border border-gray-200 pl-4 pr-4 py-4 shadow-sm hover:shadow-md hover:border-violet-200 transition-all">
+              <div className={clsx("absolute inset-y-0 left-0 w-1", inc.points >= 1 ? "bg-gradient-to-b from-red-400 to-orange-500" : "bg-gradient-to-b from-red-300 to-red-400")} />
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
                     <span className="inline-flex items-center bg-violet-50 text-violet-700 px-2 py-0.5 rounded-md font-medium text-xs">
                       {inc.targetUser.name}
                     </span>
-                    <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-semibold text-xs tabular-nums">
+                    <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-0.5 rounded-md font-bold text-xs tabular-nums">
                       {fmtPts(inc.points)} pt
                     </span>
                   </div>
-                  <p className="font-medium text-slate-900 leading-snug">{inc.reasonLabel}</p>
-                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{inc.description}</p>
+                  <p className="font-medium text-gray-900 leading-snug">{inc.reasonLabel}</p>
+                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">{inc.description}</p>
                   {inc.proofUrl && (
                     <a
                       href={inc.proofUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 hover:underline mt-2.5 bg-violet-50/60 px-2 py-1 rounded-md"
+                      className="inline-flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 hover:underline mt-2.5 bg-violet-50 px-2 py-1 rounded-md"
                     >
                       <Paperclip className="w-3 h-3" /> {inc.proofName || "Ver prova"}
                     </a>
@@ -257,14 +257,14 @@ export default function QualidadePage() {
                 {isAdmin && (
                   <button
                     onClick={() => setDeleteTarget(inc)}
-                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                     title="Excluir incidência"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">
                 <span>{new Date(inc.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
                 <span>·</span>
                 <span>Registrado por {inc.reportedBy.name}</span>
@@ -275,19 +275,19 @@ export default function QualidadePage() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2.5 shrink-0">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2.5 shrink-0">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center">
                 <Plus className="w-4 h-4 text-white" />
               </div>
-              <h2 className="text-lg font-semibold text-slate-900">Nova incidência de qualidade</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Nova incidência de qualidade</h2>
             </div>
             <form onSubmit={submitIncident} className="px-6 py-5 space-y-5 overflow-y-auto">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Pessoa *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Pessoa *</label>
                 <select
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
                   value={form.targetUserId}
                   onChange={(e) => setForm({ ...form, targetUserId: e.target.value })}
                   required
@@ -298,8 +298,8 @@ export default function QualidadePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Motivo *</label>
-                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-56 overflow-y-auto">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Motivo *</label>
+                <div className="border border-gray-200 rounded-lg max-h-56 overflow-y-auto">
                   {QUALITY_INCIDENT_REASONS.map((r) => {
                     const active = form.reasonKey === r.key;
                     return (
@@ -308,44 +308,39 @@ export default function QualidadePage() {
                         type="button"
                         onClick={() => setForm({ ...form, reasonKey: r.key })}
                         className={clsx(
-                          "w-full flex items-start gap-3 text-left px-3 py-2.5 transition-colors",
-                          active ? "bg-violet-50" : "bg-white hover:bg-slate-50"
+                          "w-full flex items-start gap-3 text-left px-3 py-2.5 transition-colors border-b border-gray-100 last:border-b-0",
+                          active ? "bg-violet-50" : "bg-white hover:bg-gray-50"
                         )}
                       >
                         <span
                           className={clsx(
                             "mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0",
-                            active ? "border-violet-600 bg-violet-600" : "border-slate-300"
+                            active ? "border-violet-600 bg-violet-600" : "border-gray-300"
                           )}
                         >
                           {active && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
                         </span>
-                        <span className={clsx("flex-1 text-sm leading-snug", active ? "text-violet-900 font-medium" : "text-slate-700")}>
+                        <span className={clsx("flex-1 text-sm leading-snug", active ? "text-violet-700 font-semibold" : "text-gray-700")}>
                           {r.label}
                         </span>
-                        <span
-                          className={clsx(
-                            "shrink-0 text-xs font-semibold tabular-nums px-1.5 py-0.5 rounded",
-                            active ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500"
-                          )}
-                        >
-                          {fmtPts(r.points)}
+                        <span className="shrink-0 text-xs font-bold tabular-nums px-2 py-0.5 rounded-md bg-red-100 text-red-700">
+                          {fmtPts(r.points)} pt
                         </span>
                       </button>
                     );
                   })}
                 </div>
                 {selectedReason && (
-                  <p className="text-xs text-amber-600 mt-1.5">
+                  <p className="text-xs text-red-600 mt-1.5">
                     Vale {fmtPts(selectedReason.points)} ponto(s) — R$ {(100 * selectedReason.points).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} de desconto
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Descrição *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Descrição *</label>
                 <textarea
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
                   rows={3}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -354,7 +349,7 @@ export default function QualidadePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Prova (imagem)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Prova (imagem)</label>
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
 
                 {!proofFile && !uploadingProof && (
@@ -365,38 +360,38 @@ export default function QualidadePage() {
                     onDrop={handleDrop}
                     className={clsx(
                       "flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-8 px-4 cursor-pointer transition-colors text-center",
-                      dragActive ? "border-violet-500 bg-violet-50" : "border-slate-200 bg-slate-50 hover:border-violet-300 hover:bg-violet-50/50"
+                      dragActive ? "border-violet-500 bg-violet-50" : "border-gray-200 bg-gray-50 hover:border-violet-300 hover:bg-violet-50"
                     )}
                   >
-                    <UploadCloud className={clsx("w-7 h-7", dragActive ? "text-violet-600" : "text-slate-400")} />
-                    <p className="text-sm text-slate-600">
+                    <UploadCloud className={clsx("w-7 h-7", dragActive ? "text-violet-600" : "text-gray-400")} />
+                    <p className="text-sm text-gray-600">
                       <span className="text-violet-600 font-medium">Clique para escolher</span> ou arraste uma imagem aqui
                     </p>
-                    <p className="text-xs text-slate-400">PNG, JPG — até 4MB</p>
+                    <p className="text-xs text-gray-400">PNG, JPG — até 4MB</p>
                   </div>
                 )}
 
                 {uploadingProof && (
-                  <div className="flex items-center justify-center gap-2 border-2 border-dashed border-violet-200 bg-violet-50/50 rounded-xl py-8">
+                  <div className="flex items-center justify-center gap-2 border-2 border-dashed border-violet-100 bg-violet-50 rounded-xl py-8">
                     <Loader2 className="w-5 h-5 animate-spin text-violet-500" />
                     <p className="text-sm text-violet-600">Enviando imagem...</p>
                   </div>
                 )}
 
                 {proofFile && !uploadingProof && (
-                  <div className="flex items-center gap-3 border border-slate-200 rounded-xl p-2.5 bg-slate-50">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-white border border-slate-200 shrink-0 flex items-center justify-center">
+                  <div className="flex items-center gap-3 border border-gray-200 rounded-xl p-2.5 bg-gray-50">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-white border border-gray-200 shrink-0 flex items-center justify-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={proofFile.url} alt={proofFile.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{proofFile.name}</p>
+                      <p className="text-sm font-medium text-gray-800 truncate">{proofFile.name}</p>
                       <p className="text-xs text-green-600 flex items-center gap-1"><Check className="w-3 h-3" /> Anexado</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => { setProofFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg shrink-0"
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg shrink-0"
                       title="Remover"
                     >
                       <X className="w-4 h-4" />
@@ -407,7 +402,7 @@ export default function QualidadePage() {
 
               {formError && <p className="text-sm text-red-600">{formError}</p>}
               <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm rounded-lg border border-slate-200 hover:bg-slate-50">Cancelar</button>
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Cancelar</button>
                 <button
                   type="submit"
                   disabled={submitting || uploadingProof}
@@ -422,18 +417,18 @@ export default function QualidadePage() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDeleteTarget(null)}>
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDeleteTarget(null)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                 <Trash2 className="w-4 h-4 text-red-600" />
               </div>
-              <p className="font-semibold text-slate-900 text-sm">Excluir incidência?</p>
+              <p className="font-semibold text-gray-900 text-sm">Excluir incidência?</p>
             </div>
-            <p className="text-sm text-slate-600 mb-1">Esta ação não pode ser desfeita:</p>
-            <p className="text-sm font-medium text-slate-800 bg-slate-50 rounded-lg px-3 py-2 mb-4 truncate">{deleteTarget.reasonLabel} — {deleteTarget.targetUser.name}</p>
+            <p className="text-sm text-gray-600 mb-1">Esta ação não pode ser desfeita:</p>
+            <p className="text-sm font-medium text-gray-800 bg-gray-50 rounded-lg px-3 py-2 mb-4 truncate">{deleteTarget.reasonLabel} — {deleteTarget.targetUser.name}</p>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
               <button onClick={() => deleteIncident(deleteTarget.id)} className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">Excluir</button>
             </div>
           </div>
