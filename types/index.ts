@@ -69,6 +69,21 @@ export interface Incident {
   relatedUserId?: string | null;
 }
 
+export interface QualityIncident {
+  id: string;
+  reasonKey: string;
+  reasonLabel: string;
+  points: number;
+  description: string;
+  proofUrl?: string | null;
+  proofName?: string | null;
+  createdAt: string;
+  targetUserId: string;
+  targetUser: { id: string; name: string };
+  reportedById: string;
+  reportedBy: { id: string; name: string };
+}
+
 export interface Goal {
   id: string;
   title: string;

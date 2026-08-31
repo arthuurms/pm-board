@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
@@ -9,6 +10,7 @@ import {
   CheckCircle2,
   RotateCcw,
   AlertTriangle,
+  ShieldAlert,
   Users,
   BarChart2,
   LogOut,
@@ -21,23 +23,35 @@ import {
 import { useTheme } from "@/lib/theme";
 
 const NAV_ALL = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
-  { href: "/tasks", label: "Tarefas", icon: ListTodo, adminOnly: false },
-  { href: "/daily-tasks", label: "Tarefas Diárias", icon: CalendarCheck, adminOnly: false },
-  { href: "/metas", label: "Metas", icon: Target, adminOnly: false },
-  { href: "/completed", label: "Concluídas", icon: CheckCircle2, adminOnly: false },
-  { href: "/rework", label: "Concluídas — Retrabalho", icon: RotateCcw, adminOnly: false },
-  { href: "/incidents", label: "Incidentes", icon: AlertTriangle, adminOnly: false },
-  { href: "/performance", label: "Análise de Desempenho", icon: BarChart2, adminOnly: false },
-  { href: "/users", label: "Usuários & Permissões", icon: Users, adminOnly: true },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false, permission: null as string | null },
+  { href: "/tasks", label: "Tarefas", icon: ListTodo, adminOnly: false, permission: null },
+  { href: "/daily-tasks", label: "Tarefas Diárias", icon: CalendarCheck, adminOnly: false, permission: null },
+  { href: "/metas", label: "Metas", icon: Target, adminOnly: false, permission: null },
+  { href: "/completed", label: "Concluídas", icon: CheckCircle2, adminOnly: false, permission: null },
+  { href: "/rework", label: "Concluídas — Retrabalho", icon: RotateCcw, adminOnly: false, permission: null },
+  { href: "/incidents", label: "Incidentes", icon: AlertTriangle, adminOnly: false, permission: null },
+  { href: "/qualidade", label: "Qualidade de Serviço", icon: ShieldAlert, adminOnly: false, permission: "manage_quality_incidents" },
+  { href: "/performance", label: "Análise de Desempenho", icon: BarChart2, adminOnly: false, permission: null },
+  { href: "/users", label: "Usuários & Permissões", icon: Users, adminOnly: true, permission: null },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
+  const user = session?.user as { id?: string; name?: string; email?: string; role?: string } | undefined;
   const isAdmin = user?.role === "admin";
-  const NAV = NAV_ALL.filter((item) => !item.adminOnly || isAdmin);
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetch(`/api/users/${user.id}/permissions`).then((r) => r.json()).then(setPermissions);
+  }, [user?.id]);
+
+  const NAV = NAV_ALL.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.permission && !permissions[item.permission]) return false;
+    return true;
+  });
   const { theme, toggle } = useTheme();
 
   return (

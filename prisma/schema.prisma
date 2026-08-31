@@ -26,6 +26,8 @@ model User {
   createdDailyTasks  DailyTask[]           @relation("DailyTaskCreator")
   goals              Goal[]                @relation("GoalAssignee")
   createdGoals       Goal[]                @relation("GoalCreator")
+  qualityIncidents        QualityIncident[] @relation("QualityIncidentTarget")
+  reportedQualityIncidents QualityIncident[] @relation("QualityIncidentReporter")
 }
 
 model Task {
@@ -99,6 +101,25 @@ model Incident {
   reportedById String
   reportedBy   User     @relation(fields: [reportedById], references: [id])
   relatedUserId String?
+}
+
+// A quality-of-service incidence tracked against a support person, tied to a fixed
+// catalog of reasons/points defined in lib/qualityIncidents.ts (payroll-linked, so not
+// admin-editable via UI — reasonKey/points are snapshotted at creation time).
+model QualityIncident {
+  id          String   @id @default(cuid())
+  reasonKey   String
+  reasonLabel String
+  points      Float
+  description String
+  proofUrl    String?
+  proofName   String?
+  createdAt   DateTime @default(now())
+
+  targetUserId String
+  targetUser   User   @relation("QualityIncidentTarget", fields: [targetUserId], references: [id])
+  reportedById String
+  reportedBy   User   @relation("QualityIncidentReporter", fields: [reportedById], references: [id])
 }
 
 // Recurring daily task template
