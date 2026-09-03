@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
 import { findQualityReason } from "@/lib/qualityIncidents";
+import { notifyQualityIncident } from "@/lib/discord";
 
 const INCLUDE = {
   targetUser: { select: { id: true, name: true } },
@@ -72,6 +73,16 @@ export async function POST(req: NextRequest) {
       reportedById: userId,
     },
     include: INCLUDE,
+  });
+
+  await notifyQualityIncident({
+    targetUserName: incident.targetUser.name,
+    reasonLabel: incident.reasonLabel,
+    points: incident.points,
+    description: incident.description,
+    proofUrl: incident.proofUrl,
+    reportedByName: incident.reportedBy.name,
+    createdAt: incident.createdAt,
   });
 
   return NextResponse.json(incident, { status: 201 });

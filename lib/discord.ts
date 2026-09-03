@@ -119,6 +119,56 @@ export async function notifyTaskCompleted(task: TaskEmbedData): Promise<string |
   }
 }
 
+type QualityIncidentEmbedData = {
+  targetUserName: string;
+  reasonLabel: string;
+  points: number;
+  description: string;
+  proofUrl: string | null;
+  reportedByName: string;
+  createdAt: Date;
+};
+
+function formatPoints(points: number): string {
+  return points.toLocaleString("pt-BR", { minimumFractionDigits: 1 });
+}
+
+// Posts a quality-incident notification. Does not @mention the person publicly —
+// it's a payroll-linked penalty, not something to broadcast as a ping.
+export async function notifyQualityIncident(incident: QualityIncidentEmbedData): Promise<void> {
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const fields = [
+    { name: "Pessoa", value: incident.targetUserName, inline: true },
+    { name: "Pontos", value: `${formatPoints(incident.points)} pt`, inline: true },
+    { name: "Registrado por", value: mentionOrName(incident.reportedByName), inline: true },
+    { name: "Motivo", value: incident.reasonLabel },
+    { name: "Descrição", value: incident.description },
+  ];
+
+  const embed = {
+    title: "⚠️ Incidência de qualidade registrada",
+    color: 0xef4444,
+    fields,
+    image: incident.proofUrl ? { url: incident.proofUrl } : undefined,
+    timestamp: incident.createdAt.toISOString(),
+  };
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ embeds: [embed] }),
+    });
+    if (!res.ok) {
+      console.error("Discord quality-incident webhook failed:", res.status, await res.text());
+    }
+  } catch (err) {
+    console.error("Discord quality-incident webhook error:", err);
+  }
+}
+
 // Edits a previously sent completion message to mark it as approved ("Tarefa correta").
 export async function notifyTaskApproved(messageId: string, task: TaskEmbedData): Promise<void> {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
