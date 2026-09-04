@@ -30,7 +30,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   mark_rework: "Marcar como retrabalho",
   create_incident: "Registrar incidente",
   manage_permissions: "Gerenciar permissões",
-  view_all_tasks: "Ver tarefas de todo mundo (exceto admins)",
+  view_all_tasks: "Ver tarefas de todo mundo (incluindo admins)",
   manage_all_tasks: "Editar, excluir e reatribuir qualquer tarefa",
   manage_quality_incidents: "Qualidade de Serviço (registrar e ver incidências)",
 };

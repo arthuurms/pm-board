@@ -264,7 +264,7 @@ export default function TasksPage() {
             onChange={(e) => setFilterUser(e.target.value)}
           >
             <option value="">Todos os responsáveis</option>
-            {(isAdmin ? users : users.filter((u) => u.role !== "admin")).map((u) => (
+            {users.map((u) => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>

@@ -149,7 +149,7 @@ export default function CompletedPage() {
             value={filterUser} onChange={e => setFilterUser(e.target.value)}
           >
             <option value="">Todos</option>
-            {(isAdmin ? users : users.filter(u => u.role !== "admin")).map(u => (
+            {users.map(u => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>

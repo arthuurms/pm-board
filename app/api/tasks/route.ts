@@ -40,12 +40,8 @@ export async function GET(req: NextRequest) {
     // Regular collaborators only ever see their own tasks — the assigneeId
     // param is ignored so they can't request someone else's.
     where.assigneeId = userId;
-  } else {
-    if (assigneeIdParam) where.assigneeId = assigneeIdParam;
-    if (!isAdmin) {
-      // Granted "view all" without being an admin: everyone except admins.
-      where.assignee = { role: { not: "admin" } };
-    }
+  } else if (assigneeIdParam) {
+    where.assigneeId = assigneeIdParam;
   }
 
   if (month) {
