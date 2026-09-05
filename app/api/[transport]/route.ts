@@ -386,6 +386,92 @@ const mcpHandler = createMcpHandler(
     );
 
     server.registerTool(
+      "criar_meta",
+      {
+        title: "Criar meta",
+        description: "Cria uma meta no Clickfy, atribuída a uma pessoa (fica visível na aba Metas até ser marcada como concluída).",
+        inputSchema: {
+          titulo: z.string().describe("Título da meta"),
+          descricao: z.string().optional().describe("Descrição opcional da meta"),
+          responsavel: z.string().describe("Nome da pessoa responsável pela meta"),
+          solicitadoPor: z.string().describe("Nome de quem está criando a meta"),
+        },
+      },
+      async ({ titulo, descricao, responsavel, solicitadoPor }) => {
+        const assignee = await resolveUser(responsavel);
+        const creator = await resolveUser(solicitadoPor);
+
+        if (!assignee || !creator) {
+          const users = await prisma.user.findMany({ select: { name: true } });
+          const names = users.map((u) => u.name).join(", ");
+          const who = !assignee ? responsavel : solicitadoPor;
+          return {
+            isError: true,
+            content: [{ type: "text", text: `Não encontrei ninguém chamado "${who}". Pessoas cadastradas: ${names}` }],
+          };
+        }
+
+        const goal = await prisma.goal.create({
+          data: {
+            title: titulo,
+            description: descricao || null,
+            assigneeId: assignee.id,
+            creatorId: creator.id,
+          },
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: `Meta "${goal.title}" criada para ${assignee.name}, solicitada por ${creator.name}.`,
+          }],
+        };
+      }
+    );
+
+    server.registerTool(
+      "listar_metas",
+      {
+        title: "Listar metas",
+        description: "Lista as metas cadastradas no Clickfy, opcionalmente filtrando por responsável.",
+        inputSchema: {
+          responsavel: z.string().optional().describe("Nome da pessoa responsável, para filtrar (opcional)"),
+        },
+      },
+      async ({ responsavel }) => {
+        let assigneeId: string | undefined;
+        if (responsavel) {
+          const assignee = await resolveUser(responsavel);
+          if (!assignee) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return {
+              isError: true,
+              content: [{ type: "text", text: `Não encontrei ninguém chamado "${responsavel}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }],
+            };
+          }
+          assigneeId = assignee.id;
+        }
+
+        const goals = await prisma.goal.findMany({
+          where: assigneeId ? { assigneeId } : {},
+          include: { assignee: { select: { name: true } }, creator: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 30,
+        });
+
+        if (goals.length === 0) {
+          return { content: [{ type: "text", text: "Nenhuma meta encontrada." }] };
+        }
+
+        const lines = goals.map((g) => {
+          const status = g.completed ? "concluída" : "em aberto";
+          return `- "${g.title}"${g.description ? ` — ${g.description}` : ""} | responsável: ${g.assignee.name} | criada por: ${g.creator.name} | status: ${status}`;
+        });
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+    );
+
+    server.registerTool(
       "listar_tags",
       {
         title: "Listar tags",
