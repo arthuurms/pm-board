@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { title, description, category, severity, occurredAt, relatedUserId } = body;
+  const { title, description, category, severity, occurredAt, relatedUserId, attachmentUrl, attachmentName } = body;
 
   if (!title || !category || !severity || !occurredAt) {
     return NextResponse.json({ error: "title, category, severity, occurredAt são obrigatórios" }, { status: 400 });
@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
       occurredAt: new Date(occurredAt),
       reportedById: userId,
       relatedUserId: relatedUserId || null,
+      attachmentUrl: attachmentUrl || null,
+      attachmentName: attachmentName || null,
     },
     include: INCLUDE,
   });

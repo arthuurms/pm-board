@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { Incident, User } from "@/types";
 import { SeverityBadge, CategoryLabel } from "@/components/ui/Badge";
-import { AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
+import clsx from "clsx";
+import { AlertTriangle, Plus, Trash2, Pencil, Paperclip, UploadCloud, Loader2, Check, X } from "lucide-react";
 
 interface FormState {
   title: string;
@@ -33,6 +34,10 @@ export default function IncidentsPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [attachment, setAttachment] = useState<{ url: string; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetch("/api/users").then((r) => r.json()).then(setUsers); }, []);
   useEffect(() => {
@@ -54,6 +59,7 @@ export default function IncidentsPage() {
   function openCreate() {
     setEditingIncident(null);
     setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
+    setAttachment(null);
     setFormError("");
     setShowForm(true);
   }
@@ -68,8 +74,36 @@ export default function IncidentsPage() {
       occurredAt: new Date(inc.occurredAt).toISOString().slice(0, 16),
       relatedUserId: inc.relatedUserId ?? "",
     });
+    setAttachment(inc.attachmentUrl ? { url: inc.attachmentUrl, name: inc.attachmentName ?? "prova" } : null);
     setFormError("");
     setShowForm(true);
+  }
+
+  async function uploadAttachment(file: File) {
+    setUploading(true);
+    setFormError("");
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    setUploading(false);
+    if (!res.ok) {
+      setFormError((await res.json()).error || "Falha ao enviar arquivo");
+      return;
+    }
+    const data = await res.json();
+    setAttachment({ url: data.url, name: data.name });
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) uploadAttachment(file);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadAttachment(file);
   }
 
   async function submitIncident(e: React.FormEvent) {
@@ -80,13 +114,19 @@ export default function IncidentsPage() {
     const res = await fetch(url, {
       method: editingIncident ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, relatedUserId: form.relatedUserId || null }),
+      body: JSON.stringify({
+        ...form,
+        relatedUserId: form.relatedUserId || null,
+        attachmentUrl: attachment?.url ?? null,
+        attachmentName: attachment?.name ?? null,
+      }),
     });
     setSubmitting(false);
     if (!res.ok) { setFormError((await res.json()).error); return; }
     setShowForm(false);
     setEditingIncident(null);
     setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
+    setAttachment(null);
     load();
   }
 
@@ -134,6 +174,16 @@ export default function IncidentsPage() {
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">{inc.title}</p>
                   {inc.description && <p className="text-sm text-gray-500 mt-0.5">{inc.description}</p>}
+                  {inc.attachmentUrl && (
+                    <a
+                      href={inc.attachmentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 hover:underline mt-2 bg-red-50 px-2 py-1 rounded-md"
+                    >
+                      <Paperclip className="w-3 h-3" /> {inc.attachmentName || "Ver foto"}
+                    </a>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <SeverityBadge severity={inc.severity} />
@@ -176,9 +226,9 @@ export default function IncidentsPage() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-            <div className="px-6 py-4 border-b"><h2 className="text-lg font-semibold">{editingIncident ? "Editar Incidente" : "Registrar Incidente"}</h2></div>
-            <form onSubmit={submitIncident} className="px-6 py-4 space-y-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b shrink-0"><h2 className="text-lg font-semibold">{editingIncident ? "Editar Incidente" : "Registrar Incidente"}</h2></div>
+            <form onSubmit={submitIncident} className="px-6 py-4 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Título *</label>
                 <input className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
@@ -225,6 +275,57 @@ export default function IncidentsPage() {
                     {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Foto (evidência)</label>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+                {!attachment && !uploading && (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={handleDrop}
+                    className={clsx(
+                      "flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-6 px-4 cursor-pointer transition-colors text-center",
+                      dragActive ? "border-red-500 bg-red-50" : "border-gray-200 bg-gray-50 hover:border-red-300 hover:bg-red-50"
+                    )}
+                  >
+                    <UploadCloud className={clsx("w-6 h-6", dragActive ? "text-red-600" : "text-gray-400")} />
+                    <p className="text-sm text-gray-600">
+                      <span className="text-red-600 font-medium">Clique para escolher</span> ou arraste uma foto aqui
+                    </p>
+                    <p className="text-xs text-gray-400">PNG, JPG — até 4MB</p>
+                  </div>
+                )}
+
+                {uploading && (
+                  <div className="flex items-center justify-center gap-2 border-2 border-dashed border-red-100 bg-red-50 rounded-xl py-6">
+                    <Loader2 className="w-5 h-5 animate-spin text-red-500" />
+                    <p className="text-sm text-red-600">Enviando foto...</p>
+                  </div>
+                )}
+
+                {attachment && !uploading && (
+                  <div className="flex items-center gap-3 border border-gray-200 rounded-xl p-2.5 bg-gray-50">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-white border border-gray-200 shrink-0 flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={attachment.url} alt={attachment.name} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{attachment.name}</p>
+                      <p className="text-xs text-green-600 flex items-center gap-1"><Check className="w-3 h-3" /> Anexado</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setAttachment(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg shrink-0"
+                      title="Remover"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
               {formError && <p className="text-sm text-red-600">{formError}</p>}
               <div className="flex justify-end gap-2 pt-2">

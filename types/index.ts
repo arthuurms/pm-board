@@ -67,6 +67,8 @@ export interface Incident {
   reportedById: string;
   reportedBy: { id: string; name: string };
   relatedUserId?: string | null;
+  attachmentUrl?: string | null;
+  attachmentName?: string | null;
 }
 
 export interface QualityIncident {

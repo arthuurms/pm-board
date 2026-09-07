@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!canEdit) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { title, description, category, severity, occurredAt, relatedUserId } = body;
+  const { title, description, category, severity, occurredAt, relatedUserId, attachmentUrl, attachmentName } = body;
 
   if (!title || !category || !severity || !occurredAt) {
     return NextResponse.json({ error: "title, category, severity, occurredAt são obrigatórios" }, { status: 400 });
@@ -47,6 +47,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       severity,
       occurredAt: new Date(occurredAt),
       relatedUserId: relatedUserId || null,
+      attachmentUrl: attachmentUrl || null,
+      attachmentName: attachmentName || null,
     },
     include: { reportedBy: { select: { id: true, name: true } } },
   });
