@@ -45,10 +45,13 @@ export async function POST(req: NextRequest) {
   if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { title, description, category, severity, occurredAt, relatedUserId, attachmentUrl, attachmentName } = body;
+  const { title, description, category, severity, occurredAt, relatedUserId, attachmentUrls, attachmentNames } = body;
 
   if (!title || !category || !severity || !occurredAt) {
     return NextResponse.json({ error: "title, category, severity, occurredAt são obrigatórios" }, { status: 400 });
+  }
+  if (attachmentUrls && attachmentUrls.length > 10) {
+    return NextResponse.json({ error: "Máximo de 10 fotos por incidente" }, { status: 400 });
   }
 
   const incident = await prisma.incident.create({
@@ -60,8 +63,8 @@ export async function POST(req: NextRequest) {
       occurredAt: new Date(occurredAt),
       reportedById: userId,
       relatedUserId: relatedUserId || null,
-      attachmentUrl: attachmentUrl || null,
-      attachmentName: attachmentName || null,
+      attachmentUrls: attachmentUrls ?? [],
+      attachmentNames: attachmentNames ?? [],
     },
     include: INCLUDE,
   });

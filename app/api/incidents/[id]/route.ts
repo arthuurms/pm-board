@@ -32,10 +32,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!canEdit) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { title, description, category, severity, occurredAt, relatedUserId, attachmentUrl, attachmentName } = body;
+  const { title, description, category, severity, occurredAt, relatedUserId, attachmentUrls, attachmentNames } = body;
 
   if (!title || !category || !severity || !occurredAt) {
     return NextResponse.json({ error: "title, category, severity, occurredAt são obrigatórios" }, { status: 400 });
+  }
+  if (attachmentUrls && attachmentUrls.length > 10) {
+    return NextResponse.json({ error: "Máximo de 10 fotos por incidente" }, { status: 400 });
   }
 
   const updated = await prisma.incident.update({
@@ -47,8 +50,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       severity,
       occurredAt: new Date(occurredAt),
       relatedUserId: relatedUserId || null,
-      attachmentUrl: attachmentUrl || null,
-      attachmentName: attachmentName || null,
+      attachmentUrls: attachmentUrls ?? [],
+      attachmentNames: attachmentNames ?? [],
     },
     include: { reportedBy: { select: { id: true, name: true } } },
   });

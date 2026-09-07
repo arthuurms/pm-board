@@ -101,8 +101,8 @@ model Incident {
   reportedById String
   reportedBy   User     @relation(fields: [reportedById], references: [id])
   relatedUserId String?
-  attachmentUrl  String? // evidence photo, stored in Vercel Blob
-  attachmentName String?
+  attachmentUrls  String[] @default([]) // evidence photos, stored in Vercel Blob (parallel to attachmentNames)
+  attachmentNames String[] @default([])
 }
 
 // A quality-of-service incidence tracked against a support person, tied to a fixed

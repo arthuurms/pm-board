@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { Incident, User } from "@/types";
 import { SeverityBadge, CategoryLabel } from "@/components/ui/Badge";
 import clsx from "clsx";
-import { AlertTriangle, Plus, Trash2, Pencil, Paperclip, UploadCloud, Loader2, Check, X } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Pencil, Paperclip, UploadCloud, Loader2, X } from "lucide-react";
 
 interface FormState {
   title: string;
@@ -34,10 +34,11 @@ export default function IncidentsPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
-  const [attachment, setAttachment] = useState<{ url: string; name: string } | null>(null);
+  const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const MAX_ATTACHMENTS = 10;
 
   useEffect(() => { fetch("/api/users").then((r) => r.json()).then(setUsers); }, []);
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function IncidentsPage() {
   function openCreate() {
     setEditingIncident(null);
     setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
-    setAttachment(null);
+    setAttachments([]);
     setFormError("");
     setShowForm(true);
   }
@@ -74,36 +75,53 @@ export default function IncidentsPage() {
       occurredAt: new Date(inc.occurredAt).toISOString().slice(0, 16),
       relatedUserId: inc.relatedUserId ?? "",
     });
-    setAttachment(inc.attachmentUrl ? { url: inc.attachmentUrl, name: inc.attachmentName ?? "prova" } : null);
+    setAttachments(inc.attachmentUrls.map((url, i) => ({ url, name: inc.attachmentNames[i] ?? "prova" })));
     setFormError("");
     setShowForm(true);
   }
 
-  async function uploadAttachment(file: File) {
-    setUploading(true);
-    setFormError("");
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: fd });
-    setUploading(false);
-    if (!res.ok) {
-      setFormError((await res.json()).error || "Falha ao enviar arquivo");
+  async function uploadAttachments(files: FileList | File[]) {
+    const list = Array.from(files);
+    const remaining = MAX_ATTACHMENTS - attachments.length;
+    if (remaining <= 0) {
+      setFormError(`Máximo de ${MAX_ATTACHMENTS} fotos por incidente`);
       return;
     }
-    const data = await res.json();
-    setAttachment({ url: data.url, name: data.name });
+    const toUpload = list.slice(0, remaining);
+    if (list.length > toUpload.length) {
+      setFormError(`Só cabem mais ${remaining} foto(s) (máximo de ${MAX_ATTACHMENTS})`);
+    } else {
+      setFormError("");
+    }
+
+    setUploading(true);
+    for (const file of toUpload) {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      if (!res.ok) {
+        setFormError((await res.json()).error || "Falha ao enviar arquivo");
+        continue;
+      }
+      const data = await res.json();
+      setAttachments((prev) => [...prev, { url: data.url, name: data.name }]);
+    }
+    setUploading(false);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) uploadAttachment(file);
+    if (e.target.files?.length) uploadAttachments(e.target.files);
+    e.target.value = "";
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) uploadAttachment(file);
+    if (e.dataTransfer.files?.length) uploadAttachments(e.dataTransfer.files);
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function submitIncident(e: React.FormEvent) {
@@ -117,8 +135,8 @@ export default function IncidentsPage() {
       body: JSON.stringify({
         ...form,
         relatedUserId: form.relatedUserId || null,
-        attachmentUrl: attachment?.url ?? null,
-        attachmentName: attachment?.name ?? null,
+        attachmentUrls: attachments.map((a) => a.url),
+        attachmentNames: attachments.map((a) => a.name),
       }),
     });
     setSubmitting(false);
@@ -126,7 +144,7 @@ export default function IncidentsPage() {
     setShowForm(false);
     setEditingIncident(null);
     setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
-    setAttachment(null);
+    setAttachments([]);
     load();
   }
 
@@ -174,15 +192,25 @@ export default function IncidentsPage() {
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">{inc.title}</p>
                   {inc.description && <p className="text-sm text-gray-500 mt-0.5">{inc.description}</p>}
-                  {inc.attachmentUrl && (
-                    <a
-                      href={inc.attachmentUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 hover:underline mt-2 bg-red-50 px-2 py-1 rounded-md"
-                    >
-                      <Paperclip className="w-3 h-3" /> {inc.attachmentName || "Ver foto"}
-                    </a>
+                  {inc.attachmentUrls.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      {inc.attachmentUrls.map((url, i) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-9 h-9 rounded-md overflow-hidden border border-red-100 shrink-0 hover:opacity-80 transition-opacity"
+                          title={inc.attachmentNames[i] || "Ver foto"}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={url} alt={inc.attachmentNames[i] || "prova"} className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                      <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                        <Paperclip className="w-3 h-3" /> {inc.attachmentUrls.length} foto{inc.attachmentUrls.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -277,10 +305,32 @@ export default function IncidentsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Foto (evidência)</label>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Fotos (evidência)</label>
+                  <span className="text-xs text-gray-400">{attachments.length}/{MAX_ATTACHMENTS}</span>
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
 
-                {!attachment && !uploading && (
+                {attachments.length > 0 && (
+                  <div className="grid grid-cols-5 gap-2 mb-2">
+                    {attachments.map((a, i) => (
+                      <div key={a.url} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 bg-white">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={a.url} alt={a.name} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(i)}
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                          title="Remover"
+                        >
+                          <X className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {attachments.length < MAX_ATTACHMENTS && !uploading && (
                   <div
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -293,37 +343,16 @@ export default function IncidentsPage() {
                   >
                     <UploadCloud className={clsx("w-6 h-6", dragActive ? "text-red-600" : "text-gray-400")} />
                     <p className="text-sm text-gray-600">
-                      <span className="text-red-600 font-medium">Clique para escolher</span> ou arraste uma foto aqui
+                      <span className="text-red-600 font-medium">Clique para escolher</span> ou arraste fotos aqui
                     </p>
-                    <p className="text-xs text-gray-400">PNG, JPG — até 4MB</p>
+                    <p className="text-xs text-gray-400">PNG, JPG — até 4MB cada, até {MAX_ATTACHMENTS} fotos</p>
                   </div>
                 )}
 
                 {uploading && (
                   <div className="flex items-center justify-center gap-2 border-2 border-dashed border-red-100 bg-red-50 rounded-xl py-6">
                     <Loader2 className="w-5 h-5 animate-spin text-red-500" />
-                    <p className="text-sm text-red-600">Enviando foto...</p>
-                  </div>
-                )}
-
-                {attachment && !uploading && (
-                  <div className="flex items-center gap-3 border border-gray-200 rounded-xl p-2.5 bg-gray-50">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-white border border-gray-200 shrink-0 flex items-center justify-center">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={attachment.url} alt={attachment.name} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{attachment.name}</p>
-                      <p className="text-xs text-green-600 flex items-center gap-1"><Check className="w-3 h-3" /> Anexado</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setAttachment(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg shrink-0"
-                      title="Remover"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    <p className="text-sm text-red-600">Enviando foto(s)...</p>
                   </div>
                 )}
               </div>
