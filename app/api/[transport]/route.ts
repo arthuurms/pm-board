@@ -2,6 +2,7 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyAccessToken } from "@/lib/oauth";
+import { describeSchedule, isValidTimeOfDay } from "@/lib/scheduleFormat";
 
 const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
 const INCIDENT_CATEGORY_VALUES = ["ops_down", "service_failure", "revenue_loss"] as const;
@@ -36,6 +37,40 @@ async function resolveTag(name: string) {
 function parseBrasiliaDateTime(value: string): Date {
   const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(value);
   return new Date(hasOffset ? value : `${value}-03:00`);
+}
+
+const WEEKDAY_ALIASES: Record<string, number> = { dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6 };
+
+// "todos" | "uteis" | "seg,qua,sex" -> sorted weekday numbers (0 = Sunday), or null if unparseable.
+function parseWeekdays(value: string): number[] | null {
+  const v = normalize(value);
+  if (v === "todos" || v === "todo dia" || v === "diario") return [0, 1, 2, 3, 4, 5, 6];
+  if (v === "uteis" || v === "dias uteis") return [1, 2, 3, 4, 5];
+  const days = v.split(/[\s,;]+/).filter(Boolean).map((p) => WEEKDAY_ALIASES[p.slice(0, 3)]);
+  if (days.length === 0 || days.some((d) => d === undefined)) return null;
+  return [...new Set(days)].sort((a, b) => a - b);
+}
+
+async function findScheduledTask(titulo: string, responsavel?: string) {
+  let assigneeId: string | undefined;
+  if (responsavel) {
+    const assignee = await resolveUser(responsavel);
+    if (!assignee) {
+      const users = await prisma.user.findMany({ select: { name: true } });
+      return { error: `Não encontrei ninguém chamado "${responsavel}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` };
+    }
+    assigneeId = assignee.id;
+  }
+  const candidates = await prisma.scheduledTask.findMany({
+    where: { title: { contains: titulo, mode: "insensitive" }, ...(assigneeId ? { assigneeId } : {}) },
+    include: { assignee: { select: { name: true } } },
+  });
+  if (candidates.length === 0) return { error: `Nenhuma tarefa programada encontrada com "${titulo}" no título.` };
+  if (candidates.length > 1) {
+    const lines = candidates.map((c) => `- "${c.title}" (responsável: ${c.assignee.name})`);
+    return { error: `Mais de uma tarefa programada encontrada com "${titulo}" — seja mais específico:\n${lines.join("\n")}` };
+  }
+  return { schedule: candidates[0] };
 }
 
 const mcpHandler = createMcpHandler(
@@ -468,6 +503,172 @@ const mcpHandler = createMcpHandler(
           return `- "${g.title}"${g.description ? ` — ${g.description}` : ""} | responsável: ${g.assignee.name} | criada por: ${g.creator.name} | status: ${status}`;
         });
         return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+    );
+
+    server.registerTool(
+      "criar_tarefa_programada",
+      {
+        title: "Criar tarefa programada",
+        description: "Cria uma tarefa recorrente: o Clickfy gera sozinho uma nova tarefa para o responsável no horário (Brasília) e nos dias escolhidos, ex: todo dia às 18:00.",
+        inputSchema: {
+          titulo: z.string().describe("Título da tarefa que será criada a cada ocorrência"),
+          descricao: z.string().optional().describe("Descrição opcional"),
+          responsavel: z.string().describe("Nome da pessoa que recebe a tarefa"),
+          solicitadoPor: z.string().describe("Nome de quem está criando a programação"),
+          horario: z.string().describe("Horário no formato HH:mm, horário de Brasília (ex: 18:00)"),
+          dias: z.string().optional().describe('Dias da semana: "todos" (padrão), "uteis" (seg a sex) ou lista como "seg,qua,sex" (dom,seg,ter,qua,qui,sex,sab)'),
+          prazoHoras: z.number().int().min(1).max(720).optional().describe("Prazo da tarefa em horas depois de criada (padrão: 24)"),
+          prioridade: z.enum(PRIORITY_VALUES).optional().describe("low, medium, high ou urgent (padrão: medium)"),
+          pais: z.string().optional().describe("Tag de país, ex: Colômbia, México (opcional)"),
+        },
+      },
+      async ({ titulo, descricao, responsavel, solicitadoPor, horario, dias, prazoHoras, prioridade, pais }) => {
+        const assignee = await resolveUser(responsavel);
+        const creator = await resolveUser(solicitadoPor);
+        if (!assignee || !creator) {
+          const users = await prisma.user.findMany({ select: { name: true } });
+          const who = !assignee ? responsavel : solicitadoPor;
+          return { isError: true, content: [{ type: "text", text: `Não encontrei ninguém chamado "${who}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }] };
+        }
+        if (!isValidTimeOfDay(horario)) {
+          return { isError: true, content: [{ type: "text", text: `Horário inválido "${horario}". Use HH:mm, ex: 18:00.` }] };
+        }
+        const daysOfWeek = dias ? parseWeekdays(dias) : [0, 1, 2, 3, 4, 5, 6];
+        if (!daysOfWeek) {
+          return { isError: true, content: [{ type: "text", text: `Não entendi os dias "${dias}". Use "todos", "uteis" ou uma lista como "seg,qua,sex".` }] };
+        }
+        let tagId: string | undefined;
+        if (pais) {
+          const tag = await resolveTag(pais);
+          if (!tag) {
+            const tags = await prisma.tag.findMany();
+            return { isError: true, content: [{ type: "text", text: `Não encontrei a tag "${pais}". Tags cadastradas: ${tags.map((t) => t.name).join(", ")}` }] };
+          }
+          tagId = tag.id;
+        }
+
+        const schedule = await prisma.scheduledTask.create({
+          data: {
+            title: titulo,
+            description: descricao || null,
+            priority: prioridade || "medium",
+            timeOfDay: horario,
+            daysOfWeek,
+            dueInHours: prazoHoras ?? 24,
+            assigneeId: assignee.id,
+            creatorId: creator.id,
+            tagId,
+          },
+        });
+        return {
+          content: [{
+            type: "text",
+            text: `Tarefa programada "${schedule.title}" criada para ${assignee.name}: ${describeSchedule(schedule.timeOfDay, schedule.daysOfWeek)} (prazo de ${schedule.dueInHours}h). A primeira tarefa chega na próxima ocorrência do horário.`,
+          }],
+        };
+      }
+    );
+
+    server.registerTool(
+      "listar_tarefas_programadas",
+      {
+        title: "Listar tarefas programadas",
+        description: "Lista as tarefas recorrentes cadastradas no Clickfy, opcionalmente filtrando por responsável.",
+        inputSchema: {
+          responsavel: z.string().optional().describe("Nome da pessoa responsável, para filtrar (opcional)"),
+        },
+      },
+      async ({ responsavel }) => {
+        let assigneeId: string | undefined;
+        if (responsavel) {
+          const assignee = await resolveUser(responsavel);
+          if (!assignee) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return { isError: true, content: [{ type: "text", text: `Não encontrei ninguém chamado "${responsavel}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }] };
+          }
+          assigneeId = assignee.id;
+        }
+        const schedules = await prisma.scheduledTask.findMany({
+          where: assigneeId ? { assigneeId } : {},
+          include: { assignee: { select: { name: true } }, tag: true },
+          orderBy: { createdAt: "desc" },
+        });
+        if (schedules.length === 0) return { content: [{ type: "text", text: "Nenhuma tarefa programada encontrada." }] };
+        const lines = schedules.map((s) => {
+          const tagLabel = s.tag ? ` | tag: ${s.tag.name}` : "";
+          return `- "${s.title}" | responsável: ${s.assignee.name} | ${describeSchedule(s.timeOfDay, s.daysOfWeek)} | prazo: ${s.dueInHours}h | prioridade: ${s.priority} | ${s.active ? "ativa" : "pausada"}${tagLabel}`;
+        });
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+    );
+
+    server.registerTool(
+      "alterar_tarefa_programada",
+      {
+        title: "Alterar tarefa programada",
+        description: "Altera uma tarefa recorrente existente (busca pelo título): horário, dias, prazo, prioridade, título, descrição, ou pausa/retoma.",
+        inputSchema: {
+          titulo: z.string().describe("Título (ou parte dele) da tarefa programada"),
+          responsavel: z.string().optional().describe("Nome do responsável, para desempatar títulos parecidos"),
+          novoHorario: z.string().optional().describe("Novo horário HH:mm, horário de Brasília"),
+          novosDias: z.string().optional().describe('Novos dias: "todos", "uteis" ou lista como "seg,qua,sex"'),
+          novoPrazoHoras: z.number().int().min(1).max(720).optional(),
+          novaPrioridade: z.enum(PRIORITY_VALUES).optional(),
+          novoTitulo: z.string().optional(),
+          novaDescricao: z.string().optional(),
+          ativa: z.boolean().optional().describe("false pausa a programação, true retoma"),
+        },
+      },
+      async ({ titulo, responsavel, novoHorario, novosDias, novoPrazoHoras, novaPrioridade, novoTitulo, novaDescricao, ativa }) => {
+        const found = await findScheduledTask(titulo, responsavel);
+        if (found.error !== undefined) return { isError: true, content: [{ type: "text", text: found.error }] };
+
+        const data: Record<string, unknown> = {};
+        if (novoHorario !== undefined) {
+          if (!isValidTimeOfDay(novoHorario)) return { isError: true, content: [{ type: "text", text: `Horário inválido "${novoHorario}". Use HH:mm.` }] };
+          data.timeOfDay = novoHorario;
+        }
+        if (novosDias !== undefined) {
+          const days = parseWeekdays(novosDias);
+          if (!days) return { isError: true, content: [{ type: "text", text: `Não entendi os dias "${novosDias}".` }] };
+          data.daysOfWeek = days;
+        }
+        if (novoPrazoHoras !== undefined) data.dueInHours = novoPrazoHoras;
+        if (novaPrioridade) data.priority = novaPrioridade;
+        if (novoTitulo) data.title = novoTitulo;
+        if (novaDescricao) data.description = novaDescricao;
+        if (ativa !== undefined) data.active = ativa;
+
+        const updated = await prisma.scheduledTask.update({
+          where: { id: found.schedule.id },
+          data,
+          include: { assignee: { select: { name: true } } },
+        });
+        return {
+          content: [{
+            type: "text",
+            text: `Tarefa programada "${updated.title}" atualizada: ${describeSchedule(updated.timeOfDay, updated.daysOfWeek)} | responsável: ${updated.assignee.name} | prazo: ${updated.dueInHours}h | ${updated.active ? "ativa" : "pausada"}.`,
+          }],
+        };
+      }
+    );
+
+    server.registerTool(
+      "excluir_tarefa_programada",
+      {
+        title: "Excluir tarefa programada",
+        description: "Exclui uma tarefa recorrente (busca pelo título). As tarefas já geradas continuam; só param de ser criadas novas.",
+        inputSchema: {
+          titulo: z.string().describe("Título (ou parte dele) da tarefa programada"),
+          responsavel: z.string().optional().describe("Nome do responsável, para desempatar títulos parecidos"),
+        },
+      },
+      async ({ titulo, responsavel }) => {
+        const found = await findScheduledTask(titulo, responsavel);
+        if (found.error !== undefined) return { isError: true, content: [{ type: "text", text: found.error }] };
+        await prisma.scheduledTask.delete({ where: { id: found.schedule.id } });
+        return { content: [{ type: "text", text: `Tarefa programada "${found.schedule.title}" (${found.schedule.assignee.name}) excluída.` }] };
       }
     );
 

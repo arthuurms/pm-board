@@ -86,6 +86,24 @@ export interface QualityIncident {
   reportedBy: { id: string; name: string };
 }
 
+export interface ScheduledTask {
+  id: string;
+  title: string;
+  description?: string | null;
+  priority: Priority;
+  timeOfDay: string;
+  daysOfWeek: number[];
+  dueInHours: number;
+  active: boolean;
+  createdAt: string;
+  assigneeId: string;
+  assignee: { id: string; name: string };
+  creatorId: string;
+  creator: { id: string; name: string };
+  tagId?: string | null;
+  tag?: Tag | null;
+}
+
 export interface Goal {
   id: string;
   title: string;
