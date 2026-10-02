@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { Incident, User } from "@/types";
 import { SeverityBadge, CategoryLabel } from "@/components/ui/Badge";
 import clsx from "clsx";
-import { AlertTriangle, Plus, Trash2, Pencil, Paperclip, UploadCloud, Loader2, X } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Pencil, Paperclip, UploadCloud, Loader2, X, CalendarDays } from "lucide-react";
 
 interface FormState {
   title: string;
@@ -13,6 +13,38 @@ interface FormState {
   severity: string;
   occurredAt: string;
   relatedUserId: string;
+}
+
+const ALL = "all";
+const NONE = "none";
+const MAX_ATTACHMENTS = 10;
+
+function currentMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// Value for <input type="datetime-local">, in the browser's local time (toISOString would give UTC).
+function toLocalInput(d: Date) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function fmtMonth(ym: string) {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
+
+function emptyForm(relatedUserId = ""): FormState {
+  return { title: "", description: "", category: "ops_down", severity: "high", occurredAt: toLocalInput(new Date()), relatedUserId };
 }
 
 export default function IncidentsPage() {
@@ -25,25 +57,24 @@ export default function IncidentsPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [showForm, setShowForm] = useState(false);
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
-  const [filterMonth, setFilterMonth] = useState("");
+  const [filterMonth, setFilterMonth] = useState(currentMonth());
+  // null until the logged-in user is known; then defaults to their own tab.
+  const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Incident | null>(null);
-  const [form, setForm] = useState<FormState>({
-    title: "", description: "", category: "ops_down", severity: "high",
-    occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "",
-  });
+  const [form, setForm] = useState<FormState>(emptyForm());
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const MAX_ATTACHMENTS = 10;
 
   useEffect(() => { fetch("/api/users").then((r) => r.json()).then(setUsers); }, []);
   useEffect(() => {
     if (!userId) return;
     fetch(`/api/users/${userId}/permissions`).then((r) => r.json()).then(setPermissions);
+    setSelectedPerson((prev) => prev ?? userId);
   }, [userId]);
 
   const load = useCallback(async () => {
@@ -57,9 +88,39 @@ export default function IncidentsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const counts = useMemo(() => {
+    const byPerson: Record<string, number> = {};
+    let none = 0;
+    for (const inc of incidents) {
+      if (inc.relatedUserId) byPerson[inc.relatedUserId] = (byPerson[inc.relatedUserId] ?? 0) + 1;
+      else none++;
+    }
+    return { byPerson, none };
+  }, [incidents]);
+
+  // Logged-in user first, then everyone else alphabetically.
+  const orderedUsers = useMemo(
+    () => [...users].sort((a, b) => (a.id === userId ? -1 : b.id === userId ? 1 : a.name.localeCompare(b.name))),
+    [users, userId]
+  );
+
+  const visible = useMemo(() => {
+    const list =
+      selectedPerson === ALL ? incidents
+      : selectedPerson === NONE ? incidents.filter((i) => !i.relatedUserId)
+      : incidents.filter((i) => i.relatedUserId === selectedPerson);
+    return [...list].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+  }, [incidents, selectedPerson]);
+
+  const selectedName =
+    selectedPerson === ALL ? "Todas as pessoas"
+    : selectedPerson === NONE ? "Sem pessoa vinculada"
+    : selectedPerson === userId ? "Você"
+    : users.find((u) => u.id === selectedPerson)?.name ?? "";
+
   function openCreate() {
     setEditingIncident(null);
-    setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
+    setForm(emptyForm(selectedPerson && selectedPerson !== ALL && selectedPerson !== NONE ? selectedPerson : ""));
     setAttachments([]);
     setFormError("");
     setShowForm(true);
@@ -72,7 +133,7 @@ export default function IncidentsPage() {
       description: inc.description ?? "",
       category: inc.category,
       severity: inc.severity,
-      occurredAt: new Date(inc.occurredAt).toISOString().slice(0, 16),
+      occurredAt: toLocalInput(new Date(inc.occurredAt)),
       relatedUserId: inc.relatedUserId ?? "",
     });
     setAttachments(inc.attachmentUrls.map((url, i) => ({ url, name: inc.attachmentNames[i] ?? "prova" })));
@@ -134,6 +195,8 @@ export default function IncidentsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
+        // Sent as an absolute instant: the browser parses the local-time input, the server (UTC) must not.
+        occurredAt: new Date(form.occurredAt).toISOString(),
         relatedUserId: form.relatedUserId || null,
         attachmentUrls: attachments.map((a) => a.url),
         attachmentNames: attachments.map((a) => a.name),
@@ -143,7 +206,7 @@ export default function IncidentsPage() {
     if (!res.ok) { setFormError((await res.json()).error); return; }
     setShowForm(false);
     setEditingIncident(null);
-    setForm({ title: "", description: "", category: "ops_down", severity: "high", occurredAt: new Date().toISOString().slice(0, 16), relatedUserId: "" });
+    setForm(emptyForm());
     setAttachments([]);
     load();
   }
@@ -154,8 +217,29 @@ export default function IncidentsPage() {
     load();
   }
 
-  const SEVERITY_ORDER = ["critical", "high", "medium", "low"];
-  const sorted = [...incidents].sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+  function pill(value: string, label: string, count: number) {
+    const active = selectedPerson === value;
+    return (
+      <button
+        key={value}
+        onClick={() => setSelectedPerson(value)}
+        className={clsx(
+          "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+          active ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-700 border-gray-200 hover:border-violet-300"
+        )}
+      >
+        {label}
+        <span
+          className={clsx(
+            "min-w-5 text-center text-xs px-1.5 py-0.5 rounded-full font-semibold",
+            active ? "bg-white/25 text-white" : count > 0 ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"
+          )}
+        >
+          {count}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -177,19 +261,47 @@ export default function IncidentsPage() {
         )}
       </div>
 
-      <div className="flex gap-3 mb-5">
+      {/* Month filter: opens on the current month */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <CalendarDays className="w-4 h-4 text-gray-400" />
         <input type="month" className="border rounded-lg px-3 py-1.5 text-sm" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} />
+        {filterMonth !== currentMonth() && (
+          <button onClick={() => setFilterMonth(currentMonth())} className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+            Mês atual
+          </button>
+        )}
+        {filterMonth !== "" && (
+          <button onClick={() => setFilterMonth("")} className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+            Todos os meses
+          </button>
+        )}
       </div>
 
+      {/* One tab per person; opens on the logged-in user's own */}
+      <div className="flex flex-wrap gap-2 mb-5">
+        {orderedUsers.map((u) => pill(u.id, u.id === userId ? `${u.name} (você)` : u.name, counts.byPerson[u.id] ?? 0))}
+        {counts.none > 0 && pill(NONE, "Sem pessoa", counts.none)}
+        {pill(ALL, "Todos", incidents.length)}
+      </div>
+
+      <p className="text-sm text-gray-500 mb-4">
+        <span className="font-semibold text-gray-900">{visible.length}</span> incidente{visible.length === 1 ? "" : "s"}
+        {selectedName && <> de <span className="font-medium text-gray-700">{selectedName}</span></>}
+        {" "}{filterMonth ? <>em <span className="capitalize">{fmtMonth(filterMonth)}</span></> : "em todos os meses"}
+      </p>
+
       {loading && <p className="text-sm text-gray-400 text-center py-12">Carregando...</p>}
-      {!loading && sorted.length === 0 && <p className="text-sm text-gray-400 text-center py-12">Nenhum incidente registrado</p>}
+      {!loading && visible.length === 0 && <p className="text-sm text-gray-400 text-center py-12">Nenhum incidente nesse filtro</p>}
 
       {!loading && (
         <div className="space-y-3">
-          {sorted.map((inc) => (
+          {visible.map((inc) => (
             <div key={inc.id} className="bg-white rounded-xl border border-red-100 p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3 mb-2">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-500 mb-1 flex items-center gap-1.5">
+                    <CalendarDays className="w-3.5 h-3.5" /> {fmtDateTime(inc.occurredAt)}
+                  </p>
                   <p className="font-medium text-gray-900">{inc.title}</p>
                   {inc.description && <p className="text-sm text-gray-500 mt-0.5">{inc.description}</p>}
                   {inc.attachmentUrls.length > 0 && (
@@ -239,12 +351,15 @@ export default function IncidentsPage() {
                 <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded font-medium">
                   <CategoryLabel category={inc.category} />
                 </span>
-                <span>Ocorrido: {new Date(inc.occurredAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
                 <span>Reportado por: {inc.reportedBy.name}</span>
-                {inc.relatedUserId && (
-                  <span className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 px-2 py-0.5 rounded font-medium">
-                    Relacionado: {users.find((u) => u.id === inc.relatedUserId)?.name ?? "—"}
-                  </span>
+                {selectedPerson === ALL && inc.relatedUserId && (
+                  <button
+                    onClick={() => setSelectedPerson(inc.relatedUserId!)}
+                    className="inline-flex items-center gap-1 bg-violet-50 text-violet-700 px-2 py-0.5 rounded font-medium hover:underline"
+                    title="Ver só desta pessoa"
+                  >
+                    {users.find((u) => u.id === inc.relatedUserId)?.name ?? "—"}
+                  </button>
                 )}
               </div>
             </div>

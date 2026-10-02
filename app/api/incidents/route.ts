@@ -21,9 +21,11 @@ export async function GET(req: NextRequest) {
 
   if (month) {
     const [y, m] = month.split("-").map(Number);
+    // Month boundaries in Brasília time (UTC-3); the server runs in UTC.
+    const BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
     where.occurredAt = {
-      gte: new Date(y, m - 1, 1),
-      lt: new Date(y, m, 1),
+      gte: new Date(Date.UTC(y, m - 1, 1) + BRT_OFFSET_MS),
+      lt: new Date(Date.UTC(y, m, 1) + BRT_OFFSET_MS),
     };
   }
 
