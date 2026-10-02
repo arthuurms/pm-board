@@ -1,11 +1,31 @@
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { put } from "@vercel/blob";
 import { verifyAccessToken } from "@/lib/oauth";
 import { describeSchedule, isValidTimeOfDay } from "@/lib/scheduleFormat";
 
 const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
-const INCIDENT_CATEGORY_VALUES = ["ops_down", "service_failure", "revenue_loss"] as const;
+const INCIDENT_CATEGORY_VALUES = [
+  "ops_down", "service_failure", "revenue_loss", "communication", "deadline_miss",
+  "quality", "process", "external", "security", "other",
+] as const;
+const INCIDENT_CATEGORY_HELP =
+  "ops_down (operação fora do ar), service_failure (falha de atendimento), revenue_loss (perda de venda/dado), communication (falha de comunicação), deadline_miss (prazo não cumprido), quality (problema de qualidade), process (falha de processo), external (causa externa), security (segurança) ou other (outro)";
+const MAX_IMAGES = 10;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const IMAGE_MIME: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" };
+
+// Only http(s): these URLs end up in <a href>/<img src>, so javascript:/data: must never be accepted.
+const imageUrlSchema = z
+  .string()
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), "A imagem precisa ser um link http(s)");
+const imageFileSchema = z.object({
+  nome: z.string().describe("Nome do arquivo com extensão, ex: print.png"),
+  base64: z.string().describe("Conteúdo da imagem em base64 (png, jpg, gif ou webp, até 4MB)"),
+});
+type ImageFile = z.infer<typeof imageFileSchema>;
 const INCIDENT_SEVERITY_VALUES = ["low", "medium", "high", "critical"] as const;
 
 function normalize(text: string): string {
@@ -37,6 +57,46 @@ async function resolveTag(name: string) {
 function parseBrasiliaDateTime(value: string): Date {
   const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(value);
   return new Date(hasOffset ? value : `${value}-03:00`);
+}
+
+function urlFileName(url: string): string {
+  try {
+    const last = decodeURIComponent(new URL(url).pathname.split("/").filter(Boolean).pop() ?? "");
+    return last || "imagem";
+  } catch {
+    return "imagem";
+  }
+}
+
+// Turns image links and/or base64 files into stored attachments (links are kept as given, base64 is uploaded to Blob).
+async function storeImages(
+  urls: string[] | undefined,
+  files: ImageFile[] | undefined
+): Promise<{ urls: string[]; names: string[] } | { error: string }> {
+  const outUrls: string[] = [];
+  const outNames: string[] = [];
+  for (const u of urls ?? []) {
+    outUrls.push(u);
+    outNames.push(urlFileName(u));
+  }
+  for (const f of files ?? []) {
+    const ext = f.nome.split(".").pop()?.toLowerCase() ?? "";
+    const contentType = IMAGE_MIME[ext];
+    if (!contentType) return { error: `Arquivo "${f.nome}" não é uma imagem aceita (use png, jpg, gif ou webp).` };
+    const buf = Buffer.from(f.base64.replace(/^data:[^,]*,/, ""), "base64");
+    if (buf.length === 0) return { error: `Arquivo "${f.nome}" está vazio ou o base64 é inválido.` };
+    if (buf.length > MAX_IMAGE_BYTES) return { error: `Arquivo "${f.nome}" tem mais de 4MB.` };
+    try {
+      const blob = await put(f.nome, buf, { access: "public", addRandomSuffix: true, contentType });
+      outUrls.push(blob.url);
+      outNames.push(f.nome);
+    } catch (err) {
+      console.error("MCP image upload failed:", err);
+      return { error: `Não consegui enviar o arquivo "${f.nome}" para o armazenamento.` };
+    }
+  }
+  if (outUrls.length > MAX_IMAGES) return { error: `Máximo de ${MAX_IMAGES} imagens.` };
+  return { urls: outUrls, names: outNames };
 }
 
 const WEEKDAY_ALIASES: Record<string, number> = { dom: 0, seg: 1, ter: 2, qua: 3, qui: 4, sex: 5, sab: 6 };
@@ -88,9 +148,11 @@ const mcpHandler = createMcpHandler(
           prazo: z.string().describe("Data e hora limite no formato YYYY-MM-DDTHH:mm, horário de Brasília"),
           prioridade: z.enum(PRIORITY_VALUES).optional().describe("low, medium, high ou urgent (padrão: medium)"),
           pais: z.string().optional().describe("Tag de país da tarefa, ex: Colômbia, México, Holanda (opcional)"),
+          imagemUrl: imageUrlSchema.optional().describe("Link (http/https) de uma imagem para anexar à tarefa (opcional)"),
+          imagemArquivo: imageFileSchema.optional().describe("Imagem em base64 para anexar à tarefa, se não houver link (opcional)"),
         },
       },
-      async ({ titulo, descricao, responsavel, solicitadoPor, prazo, prioridade, pais }) => {
+      async ({ titulo, descricao, responsavel, solicitadoPor, prazo, prioridade, pais, imagemUrl, imagemArquivo }) => {
         const assignee = await resolveUser(responsavel);
         const creator = await resolveUser(solicitadoPor);
 
@@ -117,6 +179,12 @@ const mcpHandler = createMcpHandler(
           tagId = tag.id;
         }
 
+        if (imagemUrl && imagemArquivo) {
+          return { isError: true, content: [{ type: "text", text: "Envie só um anexo por tarefa: imagemUrl ou imagemArquivo." }] };
+        }
+        const stored = await storeImages(imagemUrl ? [imagemUrl] : undefined, imagemArquivo ? [imagemArquivo] : undefined);
+        if ("error" in stored) return { isError: true, content: [{ type: "text", text: stored.error }] };
+
         const dueDate = parseBrasiliaDateTime(prazo);
         const task = await prisma.task.create({
           data: {
@@ -127,6 +195,8 @@ const mcpHandler = createMcpHandler(
             assigneeId: assignee.id,
             creatorId: creator.id,
             tagId,
+            attachmentUrl: stored.urls[0] ?? null,
+            attachmentName: stored.names[0] ?? null,
           },
         });
 
@@ -138,7 +208,7 @@ const mcpHandler = createMcpHandler(
         return {
           content: [{
             type: "text",
-            text: `Tarefa "${titulo}" criada para ${assignee.name}, solicitada por ${creator.name}, prazo ${dueDateLabel}.`,
+            text: `Tarefa "${titulo}" criada para ${assignee.name}, solicitada por ${creator.name}, prazo ${dueDateLabel}.${stored.urls.length ? " Imagem anexada." : ""}`,
           }],
         };
       }
@@ -200,9 +270,11 @@ const mcpHandler = createMcpHandler(
           novoTitulo: z.string().optional(),
           novaDescricao: z.string().optional(),
           novoPais: z.string().optional().describe("Nova tag de país, ex: Colômbia, México, Holanda"),
+          novaImagemUrl: imageUrlSchema.optional().describe("Link (http/https) de uma imagem para anexar, substituindo o anexo atual"),
+          novaImagemArquivo: imageFileSchema.optional().describe("Imagem em base64 para anexar, substituindo o anexo atual"),
         },
       },
-      async ({ titulo, responsavel, novoPrazo, novaPrioridade, novoTitulo, novaDescricao, novoPais }) => {
+      async ({ titulo, responsavel, novoPrazo, novaPrioridade, novoTitulo, novaDescricao, novoPais, novaImagemUrl, novaImagemArquivo }) => {
         let assigneeFilter: string | undefined;
         if (responsavel) {
           const assignee = await resolveUser(responsavel);
@@ -251,6 +323,15 @@ const mcpHandler = createMcpHandler(
             };
           }
           data.tagId = tag.id;
+        }
+        if (novaImagemUrl || novaImagemArquivo) {
+          if (novaImagemUrl && novaImagemArquivo) {
+            return { isError: true, content: [{ type: "text", text: "Envie só um anexo: novaImagemUrl ou novaImagemArquivo." }] };
+          }
+          const stored = await storeImages(novaImagemUrl ? [novaImagemUrl] : undefined, novaImagemArquivo ? [novaImagemArquivo] : undefined);
+          if ("error" in stored) return { isError: true, content: [{ type: "text", text: stored.error }] };
+          data.attachmentUrl = stored.urls[0];
+          data.attachmentName = stored.names[0];
         }
 
         const updated = await prisma.task.update({
@@ -368,14 +449,16 @@ const mcpHandler = createMcpHandler(
         inputSchema: {
           titulo: z.string().describe("Título da incidência"),
           descricao: z.string().optional().describe("Descrição detalhada do que aconteceu"),
-          categoria: z.enum(INCIDENT_CATEGORY_VALUES).describe("ops_down (serviço fora do ar), service_failure (falha de serviço) ou revenue_loss (perda de receita)"),
+          categoria: z.enum(INCIDENT_CATEGORY_VALUES).describe(INCIDENT_CATEGORY_HELP),
           severidade: z.enum(INCIDENT_SEVERITY_VALUES).describe("low, medium, high ou critical"),
           relacionadoA: z.string().optional().describe("Nome da pessoa relacionada à incidência (opcional)"),
           reportadoPor: z.string().describe("Nome de quem está reportando a incidência"),
           ocorreuEm: z.string().optional().describe("Data/hora em que ocorreu, formato YYYY-MM-DDTHH:mm horário de Brasília (padrão: agora)"),
+          imagensUrls: z.array(imageUrlSchema).max(MAX_IMAGES).optional().describe("Links (http/https) de imagens/prints para anexar, até 10 (opcional)"),
+          imagensArquivos: z.array(imageFileSchema).max(MAX_IMAGES).optional().describe("Imagens em base64 para anexar, até 10 no total com os links (opcional)"),
         },
       },
-      async ({ titulo, descricao, categoria, severidade, relacionadoA, reportadoPor, ocorreuEm }) => {
+      async ({ titulo, descricao, categoria, severidade, relacionadoA, reportadoPor, ocorreuEm, imagensUrls, imagensArquivos }) => {
         const reporter = await resolveUser(reportadoPor);
         if (!reporter) {
           const users = await prisma.user.findMany({ select: { name: true } });
@@ -398,6 +481,9 @@ const mcpHandler = createMcpHandler(
           relatedUserId = related.id;
         }
 
+        const stored = await storeImages(imagensUrls, imagensArquivos);
+        if ("error" in stored) return { isError: true, content: [{ type: "text", text: stored.error }] };
+
         const incident = await prisma.incident.create({
           data: {
             title: titulo,
@@ -407,6 +493,8 @@ const mcpHandler = createMcpHandler(
             occurredAt: ocorreuEm ? parseBrasiliaDateTime(ocorreuEm) : new Date(),
             reportedById: reporter.id,
             relatedUserId: relatedUserId || null,
+            attachmentUrls: stored.urls,
+            attachmentNames: stored.names,
           },
         });
 
@@ -414,7 +502,139 @@ const mcpHandler = createMcpHandler(
         return {
           content: [{
             type: "text",
-            text: `Incidência "${incident.title}" registrada (categoria: ${incident.category}, severidade: ${incident.severity}, ocorreu em: ${occurredLabel}).`,
+            text: `Incidência "${incident.title}" registrada (categoria: ${incident.category}, severidade: ${incident.severity}, ocorreu em: ${occurredLabel})${stored.urls.length ? `, com ${stored.urls.length} imagem(ns)` : ""}.`,
+          }],
+        };
+      }
+    );
+
+    server.registerTool(
+      "listar_incidencias",
+      {
+        title: "Listar incidências",
+        description: "Lista as incidências do Clickfy (mais recentes primeiro), opcionalmente por pessoa relacionada e/ou mês. Use antes de editar para ver os títulos exatos.",
+        inputSchema: {
+          relacionadoA: z.string().optional().describe("Nome da pessoa relacionada, para filtrar (opcional)"),
+          mes: z.string().optional().describe("Mês no formato YYYY-MM, horário de Brasília (opcional)"),
+        },
+      },
+      async ({ relacionadoA, mes }) => {
+        const where: Record<string, unknown> = {};
+        if (relacionadoA) {
+          const related = await resolveUser(relacionadoA);
+          if (!related) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return { isError: true, content: [{ type: "text", text: `Não encontrei ninguém chamado "${relacionadoA}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }] };
+          }
+          where.relatedUserId = related.id;
+        }
+        if (mes) {
+          if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) {
+            return { isError: true, content: [{ type: "text", text: `Mês inválido "${mes}". Use YYYY-MM, ex: 2026-10.` }] };
+          }
+          const [y, m] = mes.split("-").map(Number);
+          const BRT = 3 * 60 * 60 * 1000;
+          where.occurredAt = { gte: new Date(Date.UTC(y, m - 1, 1) + BRT), lt: new Date(Date.UTC(y, m, 1) + BRT) };
+        }
+
+        const incidents = await prisma.incident.findMany({
+          where,
+          include: { reportedBy: { select: { name: true } } },
+          orderBy: { occurredAt: "desc" },
+          take: 30,
+        });
+        if (incidents.length === 0) return { content: [{ type: "text", text: "Nenhuma incidência encontrada." }] };
+
+        const users = await prisma.user.findMany({ select: { id: true, name: true } });
+        const lines = incidents.map((i) => {
+          const when = i.occurredAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+          const who = i.relatedUserId ? users.find((u) => u.id === i.relatedUserId)?.name ?? "?" : "sem pessoa";
+          return `- "${i.title}"${i.description ? ` — ${i.description}` : ""} | ${when} | pessoa: ${who} | categoria: ${i.category} | severidade: ${i.severity} | reportado por: ${i.reportedBy.name} | imagens: ${i.attachmentUrls.length}`;
+        });
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      }
+    );
+
+    server.registerTool(
+      "editar_incidencia",
+      {
+        title: "Editar incidência",
+        description: "Edita uma incidência existente (busca pelo título, aceita parte do texto): título, descrição, categoria, severidade, data, pessoa relacionada e imagens.",
+        inputSchema: {
+          titulo: z.string().describe("Título (ou parte dele) da incidência a editar"),
+          relacionadoA: z.string().optional().describe("Pessoa relacionada atual, para desempatar quando há títulos parecidos"),
+          novoTitulo: z.string().optional(),
+          novaDescricao: z.string().optional(),
+          novaCategoria: z.enum(INCIDENT_CATEGORY_VALUES).optional().describe(INCIDENT_CATEGORY_HELP),
+          novaSeveridade: z.enum(INCIDENT_SEVERITY_VALUES).optional(),
+          novaDataOcorrencia: z.string().optional().describe("Nova data/hora, formato YYYY-MM-DDTHH:mm horário de Brasília"),
+          novaPessoaRelacionada: z.string().optional().describe("Nova pessoa relacionada; use \"nenhuma\" para desvincular"),
+          adicionarImagensUrls: z.array(imageUrlSchema).max(MAX_IMAGES).optional().describe("Links (http/https) de imagens a adicionar às já existentes"),
+          adicionarImagensArquivos: z.array(imageFileSchema).max(MAX_IMAGES).optional().describe("Imagens em base64 a adicionar às já existentes"),
+          removerTodasImagens: z.boolean().optional().describe("true remove todas as imagens atuais (aplicado antes de adicionar as novas)"),
+        },
+      },
+      async ({ titulo, relacionadoA, novoTitulo, novaDescricao, novaCategoria, novaSeveridade, novaDataOcorrencia, novaPessoaRelacionada, adicionarImagensUrls, adicionarImagensArquivos, removerTodasImagens }) => {
+        const where: Record<string, unknown> = { title: { contains: titulo, mode: "insensitive" } };
+        if (relacionadoA) {
+          const related = await resolveUser(relacionadoA);
+          if (!related) {
+            const users = await prisma.user.findMany({ select: { name: true } });
+            return { isError: true, content: [{ type: "text", text: `Não encontrei ninguém chamado "${relacionadoA}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }] };
+          }
+          where.relatedUserId = related.id;
+        }
+        const candidates = await prisma.incident.findMany({ where, orderBy: { occurredAt: "desc" } });
+        if (candidates.length === 0) {
+          return { isError: true, content: [{ type: "text", text: `Nenhuma incidência encontrada com "${titulo}" no título.` }] };
+        }
+        if (candidates.length > 1) {
+          const lines = candidates.map((c) => `- "${c.title}" (${c.occurredAt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })})`);
+          return { isError: true, content: [{ type: "text", text: `Mais de uma incidência encontrada com "${titulo}" — seja mais específico:\n${lines.join("\n")}` }] };
+        }
+        const current = candidates[0];
+
+        const data: Record<string, unknown> = {};
+        if (novoTitulo) data.title = novoTitulo;
+        if (novaDescricao !== undefined) data.description = novaDescricao || null;
+        if (novaCategoria) data.category = novaCategoria;
+        if (novaSeveridade) data.severity = novaSeveridade;
+        if (novaDataOcorrencia) data.occurredAt = parseBrasiliaDateTime(novaDataOcorrencia);
+        if (novaPessoaRelacionada) {
+          if (normalize(novaPessoaRelacionada) === "nenhuma") {
+            data.relatedUserId = null;
+          } else {
+            const related = await resolveUser(novaPessoaRelacionada);
+            if (!related) {
+              const users = await prisma.user.findMany({ select: { name: true } });
+              return { isError: true, content: [{ type: "text", text: `Não encontrei ninguém chamado "${novaPessoaRelacionada}". Pessoas cadastradas: ${users.map((u) => u.name).join(", ")}` }] };
+            }
+            data.relatedUserId = related.id;
+          }
+        }
+
+        if (removerTodasImagens || adicionarImagensUrls?.length || adicionarImagensArquivos?.length) {
+          const stored = await storeImages(adicionarImagensUrls, adicionarImagensArquivos);
+          if ("error" in stored) return { isError: true, content: [{ type: "text", text: stored.error }] };
+          const keptUrls = removerTodasImagens ? [] : current.attachmentUrls;
+          const keptNames = removerTodasImagens ? [] : current.attachmentNames;
+          if (keptUrls.length + stored.urls.length > MAX_IMAGES) {
+            return { isError: true, content: [{ type: "text", text: `Máximo de ${MAX_IMAGES} imagens por incidência (já tem ${keptUrls.length}).` }] };
+          }
+          data.attachmentUrls = [...keptUrls, ...stored.urls];
+          data.attachmentNames = [...keptNames, ...stored.names];
+        }
+
+        if (Object.keys(data).length === 0) {
+          return { isError: true, content: [{ type: "text", text: "Nada para alterar: informe pelo menos um campo novo." }] };
+        }
+
+        const updated = await prisma.incident.update({ where: { id: current.id }, data });
+        const when = updated.occurredAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+        return {
+          content: [{
+            type: "text",
+            text: `Incidência "${updated.title}" atualizada (categoria: ${updated.category}, severidade: ${updated.severity}, ocorreu em: ${when}, imagens: ${updated.attachmentUrls.length}).`,
           }],
         };
       }
