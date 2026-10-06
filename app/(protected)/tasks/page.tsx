@@ -1,12 +1,16 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { Task, User } from "@/types";
 import TaskBoard from "@/components/tasks/TaskBoard";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskDetail from "@/components/tasks/TaskDetail";
 import TaskForm from "@/components/tasks/TaskForm";
-import { Plus, LayoutGrid, List, CalendarCheck, Check, ChevronRight } from "lucide-react";
+import { Plus, LayoutGrid, List, CalendarCheck, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import {
+  addDays, dayKeyOf, dayNumber, formatDayLong, formatDayMonth, mondayOf,
+  relativeLabel, todayKey, weekdayShort, weeksBetween,
+} from "@/lib/dayKey";
 import Link from "next/link";
 import clsx from "clsx";
 
@@ -64,35 +68,108 @@ export default function TasksPage() {
   const canViewAll = isAdmin || permissions.view_all_tasks;
   const canManageAll = isAdmin || permissions.manage_all_tasks;
 
-  // Guards against out-of-order responses: if filters change quickly (e.g. the
-  // saved person filter restoring right after mount), two requests can be in
-  // flight at once, and an older one arriving after the newer one would
-  // silently overwrite it with stale (e.g. unfiltered) data.
-  const loadSeq = useRef(0);
-
   // `silent` skips the loading-spinner state, used for the background
   // auto-refresh so it doesn't unmount the task list (and any dialog open
   // inside a card, e.g. the rework-reason form) while someone is mid-edit.
+  // Person, priority and day filters are applied client-side so the person
+  // pills and the calendar counts can be computed from the same data.
   const load = useCallback(async (silent = false) => {
     if (!currentUser?.id) return;
-    const seq = ++loadSeq.current;
     if (!silent) setLoading(true);
-    const params = new URLSearchParams();
-
-    if (canViewAll && filterUser) {
-      params.set("assigneeId", filterUser);
-    }
-
-    if (filterPriority) params.set("priority", filterPriority);
-
-    const res = await fetch(`/api/tasks?${params}`);
+    const res = await fetch("/api/tasks");
     const data = await res.json();
-    if (seq !== loadSeq.current) return; // a newer request has since started
     setTasks(data);
     if (!silent) setLoading(false);
-  }, [currentUser?.id, canViewAll, filterUser, filterPriority]);
+  }, [currentUser?.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Calendar: null selection follows "today" (also after midnight); otherwise a
+  // day key "YYYY-MM-DD", "overdue" or "all". weekOffset 0 = the current week.
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const todayDay = todayKey();
+  const activeDay = selectedDay ?? todayDay;
+  const weekStart = addDays(mondayOf(todayDay), weekOffset * 7);
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  function selectDay(key: string) {
+    setSelectedDay(key === todayDay ? null : key);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) setWeekOffset(weeksBetween(mondayOf(todayDay), mondayOf(key)));
+  }
+
+  function goToToday() {
+    setSelectedDay(null);
+    setWeekOffset(0);
+  }
+
+  // Tasks of the chosen person/priority (every date), then split by day.
+  const scoped = useMemo(
+    () => tasks.filter((t) => (!filterUser || t.assigneeId === filterUser) && (!filterPriority || t.priority === filterPriority)),
+    [tasks, filterUser, filterPriority]
+  );
+
+  const byDay = useMemo(() => {
+    const map: Record<string, { total: number; done: number }> = {};
+    for (const t of scoped) {
+      const k = dayKeyOf(t.dueDate);
+      const e = (map[k] ??= { total: 0, done: 0 });
+      e.total++;
+      if (t.status === "completed") e.done++;
+    }
+    return map;
+  }, [scoped]);
+
+  const overdueCount = useMemo(
+    () => scoped.filter((t) => t.status !== "completed" && dayKeyOf(t.dueDate) < todayDay).length,
+    [scoped, todayDay]
+  );
+
+  const visibleTasks = useMemo(() => {
+    if (activeDay === "all") return scoped;
+    if (activeDay === "overdue") return scoped.filter((t) => t.status !== "completed" && dayKeyOf(t.dueDate) < todayDay);
+    return scoped.filter((t) => dayKeyOf(t.dueDate) === activeDay);
+  }, [scoped, activeDay, todayDay]);
+
+  const countByUser = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const t of tasks) m[t.assigneeId] = (m[t.assigneeId] ?? 0) + 1;
+    return m;
+  }, [tasks]);
+
+  const totals = useMemo(() => {
+    const count = (list: Task[]) => ({
+      total: list.length,
+      pending: list.filter((t) => t.status === "pending").length,
+      in_progress: list.filter((t) => t.status === "in_progress").length,
+      completed: list.filter((t) => t.status === "completed").length,
+    });
+    return { all: count(scoped), day: count(visibleTasks) };
+  }, [scoped, visibleTasks]);
+
+  function personPill(value: string, label: string, count: number) {
+    const active = filterUser === value;
+    return (
+      <button
+        key={value || "all"}
+        onClick={() => setFilterUser(value)}
+        className={clsx(
+          "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+          active ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-700 border-gray-200 hover:border-violet-300"
+        )}
+      >
+        {label}
+        <span className={clsx("min-w-5 text-center text-xs px-1.5 py-0.5 rounded-full font-semibold", active ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500")}>
+          {count}
+        </span>
+      </button>
+    );
+  }
+
+  const dayTitle =
+    activeDay === "all" ? "Todas as datas"
+    : activeDay === "overdue" ? "Atrasadas"
+    : `${relativeLabel(activeDay, todayDay) ? relativeLabel(activeDay, todayDay) + " · " : ""}${formatDayLong(activeDay)}`;
 
   // Auto-refresh so tasks created/updated elsewhere (e.g. by another person,
   // or via the MCP integration) show up without a manual page reload.
@@ -256,21 +333,16 @@ export default function TasksPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3 mb-5">
+      {/* Person filter + priority */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         {canViewAll && (
-          <select
-            className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            value={filterUser}
-            onChange={(e) => setFilterUser(e.target.value)}
-          >
-            <option value="">Todos os responsáveis</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
+          <>
+            {personPill("", "Todos", tasks.length)}
+            {users.map((u) => personPill(u.id, u.name, countByUser[u.id] ?? 0))}
+          </>
         )}
         <select
-          className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+          className="ml-auto border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
           value={filterPriority}
           onChange={(e) => setFilterPriority(e.target.value)}
         >
@@ -282,11 +354,131 @@ export default function TasksPage() {
         </select>
       </div>
 
+      {/* Totals (all dates for the chosen person) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        {[
+          { label: "Total", all: totals.all.total, day: totals.day.total, color: "text-gray-900" },
+          { label: "Pendentes", all: totals.all.pending, day: totals.day.pending, color: "text-gray-600" },
+          { label: "Em andamento", all: totals.all.in_progress, day: totals.day.in_progress, color: "text-yellow-700" },
+          { label: "Concluídas", all: totals.all.completed, day: totals.day.completed, color: "text-green-700" },
+        ].map((s) => (
+          <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
+            <p className="text-xs font-medium text-gray-500">{s.label}</p>
+            <p className={clsx("text-2xl font-bold tabular-nums", s.color)}>{s.all}</p>
+            {activeDay !== "all" && <p className="text-[11px] text-gray-400">{activeDay === "overdue" ? "atrasadas" : "no dia"}: {s.day}</p>}
+          </div>
+        ))}
+      </div>
+
+      {/* Week calendar: click a day to see what is due then (defaults to today) */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-5">
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50" title="Semana anterior">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50" title="Próxima semana">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-semibold text-gray-800">
+            {formatDayMonth(weekDays[0])} a {formatDayMonth(weekDays[6])}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {(selectedDay !== null || weekOffset !== 0) && (
+              <button onClick={goToToday} className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-gray-200 text-violet-700 hover:bg-violet-50">
+                Voltar para hoje
+              </button>
+            )}
+            <input
+              type="date"
+              className="border border-gray-200 rounded-lg px-2 py-1 text-xs"
+              value={/^\d{4}-/.test(activeDay) ? activeDay : ""}
+              onChange={(e) => e.target.value && selectDay(e.target.value)}
+              title="Ir para uma data"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <div className="grid grid-cols-7 gap-2 min-w-[560px]">
+            {weekDays.map((k) => {
+              const stat = byDay[k];
+              const open = stat ? stat.total - stat.done : 0;
+              const selected = activeDay === k;
+              const rel = relativeLabel(k, todayDay);
+              const badge = !stat ? null
+                : k < todayDay && open > 0 ? "bg-red-100 text-red-700"
+                : stat.done === stat.total ? "bg-green-100 text-green-700"
+                : "bg-violet-100 text-violet-700";
+              return (
+                <button
+                  key={k}
+                  onClick={() => selectDay(k)}
+                  title={stat ? `${stat.total} tarefa(s): ${open} em aberto, ${stat.done} concluída(s)` : "Sem tarefas"}
+                  className={clsx(
+                    "flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 transition-colors",
+                    selected ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-gray-200 text-gray-700 hover:border-violet-300"
+                  )}
+                >
+                  <span className={clsx("text-[11px] font-medium uppercase", selected ? "text-white/80" : "text-gray-400")}>{weekdayShort(k)}</span>
+                  <span className="text-lg font-bold leading-none">{dayNumber(k)}</span>
+                  <span className={clsx("text-[11px] h-4", selected ? "text-white/90 font-semibold" : k === todayDay ? "text-violet-600 font-semibold" : "text-gray-400")}>
+                    {rel ?? ""}
+                  </span>
+                  {badge ? (
+                    <span className={clsx("min-w-5 text-center text-xs font-bold px-1.5 py-0.5 rounded-full", selected ? "bg-white/25 text-white" : badge)}>
+                      {stat!.total}
+                    </span>
+                  ) : (
+                    <span className="h-5" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap mt-3">
+          {(overdueCount > 0 || activeDay === "overdue") && (
+            <button
+              onClick={() => setSelectedDay("overdue")}
+              className={clsx(
+                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+                activeDay === "overdue" ? "bg-red-600 text-white border-red-600" : "bg-white text-red-700 border-red-200 hover:bg-red-50"
+              )}
+            >
+              Atrasadas
+              <span className={clsx("min-w-5 text-center text-xs px-1.5 py-0.5 rounded-full font-semibold", activeDay === "overdue" ? "bg-white/25 text-white" : "bg-red-100 text-red-700")}>{overdueCount}</span>
+            </button>
+          )}
+          <button
+            onClick={() => setSelectedDay("all")}
+            className={clsx(
+              "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+              activeDay === "all" ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-700 border-gray-200 hover:border-violet-300"
+            )}
+          >
+            Todas as datas
+            <span className={clsx("min-w-5 text-center text-xs px-1.5 py-0.5 rounded-full font-semibold", activeDay === "all" ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500")}>{scoped.length}</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <h2 className="text-base font-semibold text-gray-900 capitalize">{dayTitle}</h2>
+        <span className="text-sm text-gray-500">{visibleTasks.length} tarefa{visibleTasks.length === 1 ? "" : "s"}</span>
+      </div>
+
       {loading && <p className="text-sm text-gray-400 text-center py-12">Carregando...</p>}
+
+      {!loading && visibleTasks.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-4 mb-3 border border-dashed border-gray-200 rounded-xl">
+          Nenhuma tarefa {activeDay === "all" ? "encontrada" : activeDay === "overdue" ? "atrasada" : "para este dia"}.
+        </p>
+      )}
 
       {!loading && view === "board" && (
         <TaskBoard
-          tasks={tasks}
+          tasks={visibleTasks}
           permissions={permissions}
           onStatusChange={changeStatus}
           onMarkRework={markRework}
@@ -303,8 +495,7 @@ export default function TasksPage() {
 
       {!loading && view === "list" && (
         <div className="space-y-3">
-          {tasks.length === 0 && <p className="text-sm text-gray-400 text-center py-12">Nenhuma tarefa ativa</p>}
-          {tasks.map((t) => (
+          {visibleTasks.map((t) => (
             <TaskCard
               key={t.id}
               task={t}
