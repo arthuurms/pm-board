@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isValidMonth } from "@/lib/goalMonth";
 
 const INCLUDE = {
   assignee: { select: { id: true, name: true } },
@@ -38,11 +39,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data.completedAt = body.completed ? new Date() : null;
   }
 
-  if (body.title !== undefined || body.description !== undefined || body.assigneeId !== undefined) {
+  if (body.title !== undefined || body.description !== undefined || body.assigneeId !== undefined || body.month !== undefined) {
     if (!isAdmin) return NextResponse.json({ error: "Apenas admins podem editar metas" }, { status: 403 });
     if (body.title !== undefined) data.title = body.title;
     if (body.description !== undefined) data.description = body.description;
     if (body.assigneeId !== undefined) data.assigneeId = body.assigneeId;
+    if (body.month !== undefined) {
+      if (!isValidMonth(body.month)) return NextResponse.json({ error: "month deve estar no formato YYYY-MM" }, { status: 400 });
+      data.month = body.month;
+    }
   }
 
   const updated = await prisma.goal.update({ where: { id }, data, include: INCLUDE });

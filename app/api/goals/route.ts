@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { currentBrtMonth, isValidMonth } from "@/lib/goalMonth";
 
 const INCLUDE = {
   assignee: { select: { id: true, name: true } },
@@ -37,13 +38,16 @@ export async function POST(req: NextRequest) {
   const requester = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   if (requester?.role !== "admin") return NextResponse.json({ error: "Apenas admins podem criar metas" }, { status: 403 });
 
-  const { title, description, assigneeId } = await req.json();
+  const { title, description, assigneeId, month } = await req.json();
   if (!title || !assigneeId) {
     return NextResponse.json({ error: "title e assigneeId são obrigatórios" }, { status: 400 });
   }
+  if (month !== undefined && month !== null && month !== "" && !isValidMonth(month)) {
+    return NextResponse.json({ error: "month deve estar no formato YYYY-MM" }, { status: 400 });
+  }
 
   const goal = await prisma.goal.create({
-    data: { title, description, assigneeId, creatorId: userId },
+    data: { title, description, assigneeId, creatorId: userId, month: month || currentBrtMonth() },
     include: INCLUDE,
   });
 

@@ -198,6 +198,7 @@ model Goal {
   completed   Boolean   @default(false)
   completedAt DateTime?
   createdAt   DateTime  @default(now())
+  month       String?   // "YYYY-MM" the goal belongs to; null on legacy rows falls back to createdAt's month (Brasília)
 }
 
 // Granular per-user permissions

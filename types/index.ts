@@ -111,6 +111,7 @@ export interface Goal {
   completed: boolean;
   completedAt?: string | null;
   createdAt: string;
+  month?: string | null;
   assigneeId: string;
   assignee: { id: string; name: string };
   creatorId: string;

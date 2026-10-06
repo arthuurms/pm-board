@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { put } from "@vercel/blob";
 import { verifyAccessToken } from "@/lib/oauth";
 import { describeSchedule, isValidTimeOfDay } from "@/lib/scheduleFormat";
+import { currentBrtMonth, goalMonth, isValidMonth } from "@/lib/goalMonth";
 
 const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
 const INCIDENT_CATEGORY_VALUES = [
@@ -650,9 +651,10 @@ const mcpHandler = createMcpHandler(
           descricao: z.string().optional().describe("Descrição opcional da meta"),
           responsavel: z.string().describe("Nome da pessoa responsável pela meta"),
           solicitadoPor: z.string().describe("Nome de quem está criando a meta"),
+          mes: z.string().optional().describe("Mês da meta no formato YYYY-MM, ex: 2026-10 (padrão: mês atual)"),
         },
       },
-      async ({ titulo, descricao, responsavel, solicitadoPor }) => {
+      async ({ titulo, descricao, responsavel, solicitadoPor, mes }) => {
         const assignee = await resolveUser(responsavel);
         const creator = await resolveUser(solicitadoPor);
 
@@ -665,6 +667,9 @@ const mcpHandler = createMcpHandler(
             content: [{ type: "text", text: `Não encontrei ninguém chamado "${who}". Pessoas cadastradas: ${names}` }],
           };
         }
+        if (mes !== undefined && !isValidMonth(mes)) {
+          return { isError: true, content: [{ type: "text", text: `Mês inválido "${mes}". Use YYYY-MM, ex: 2026-10.` }] };
+        }
 
         const goal = await prisma.goal.create({
           data: {
@@ -672,13 +677,14 @@ const mcpHandler = createMcpHandler(
             description: descricao || null,
             assigneeId: assignee.id,
             creatorId: creator.id,
+            month: mes ?? currentBrtMonth(),
           },
         });
 
         return {
           content: [{
             type: "text",
-            text: `Meta "${goal.title}" criada para ${assignee.name}, solicitada por ${creator.name}.`,
+            text: `Meta "${goal.title}" criada para ${assignee.name}, solicitada por ${creator.name}, mês ${goal.month}.`,
           }],
         };
       }
@@ -720,7 +726,7 @@ const mcpHandler = createMcpHandler(
 
         const lines = goals.map((g) => {
           const status = g.completed ? "concluída" : "em aberto";
-          return `- "${g.title}"${g.description ? ` — ${g.description}` : ""} | responsável: ${g.assignee.name} | criada por: ${g.creator.name} | status: ${status}`;
+          return `- "${g.title}"${g.description ? ` — ${g.description}` : ""} | mês: ${goalMonth(g)} | responsável: ${g.assignee.name} | criada por: ${g.creator.name} | status: ${status}`;
         });
         return { content: [{ type: "text", text: lines.join("\n") }] };
       }
