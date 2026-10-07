@@ -333,44 +333,15 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Person filter + priority */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        {canViewAll && (
-          <>
-            {personPill("", "Todos", tasks.length)}
-            {users.map((u) => personPill(u.id, u.name, countByUser[u.id] ?? 0))}
-          </>
-        )}
-        <select
-          className="ml-auto border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-          value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-        >
-          <option value="">Todas as prioridades</option>
-          <option value="low">Baixa</option>
-          <option value="medium">Média</option>
-          <option value="high">Alta</option>
-          <option value="urgent">Urgente</option>
-        </select>
-      </div>
+      {/* Who: only for people allowed to see the whole team */}
+      {canViewAll && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {personPill("", "Todos", tasks.length)}
+          {users.map((u) => personPill(u.id, u.name, countByUser[u.id] ?? 0))}
+        </div>
+      )}
 
-      {/* Totals (all dates for the chosen person) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        {[
-          { label: "Total", all: totals.all.total, day: totals.day.total, color: "text-gray-900" },
-          { label: "Pendentes", all: totals.all.pending, day: totals.day.pending, color: "text-gray-600" },
-          { label: "Em andamento", all: totals.all.in_progress, day: totals.day.in_progress, color: "text-yellow-700" },
-          { label: "Concluídas", all: totals.all.completed, day: totals.day.completed, color: "text-green-700" },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm">
-            <p className="text-xs font-medium text-gray-500">{s.label}</p>
-            <p className={clsx("text-2xl font-bold tabular-nums", s.color)}>{s.all}</p>
-            {activeDay !== "all" && <p className="text-[11px] text-gray-400">{activeDay === "overdue" ? "atrasadas" : "no dia"}: {s.day}</p>}
-          </div>
-        ))}
-      </div>
-
-      {/* Week calendar: click a day to see what is due then (defaults to today) */}
+      {/* When: week strip, opens on today */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-5">
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50" title="Semana anterior">
@@ -382,29 +353,41 @@ export default function TasksPage() {
           <span className="text-sm font-semibold text-gray-800">
             {formatDayMonth(weekDays[0])} a {formatDayMonth(weekDays[6])}
           </span>
+          {(selectedDay !== null || weekOffset !== 0) && (
+            <button onClick={goToToday} className="text-xs font-medium px-2.5 py-1 rounded-lg text-violet-700 bg-violet-50 hover:bg-violet-100">
+              Hoje
+            </button>
+          )}
           <div className="ml-auto flex items-center gap-2">
-            {(selectedDay !== null || weekOffset !== 0) && (
-              <button onClick={goToToday} className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-gray-200 text-violet-700 hover:bg-violet-50">
-                Voltar para hoje
+            {(overdueCount > 0 || activeDay === "overdue") && (
+              <button
+                onClick={() => setSelectedDay("overdue")}
+                className={clsx(
+                  "text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors",
+                  activeDay === "overdue" ? "bg-red-600 text-white border-red-600" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                )}
+              >
+                {overdueCount} atrasada{overdueCount === 1 ? "" : "s"}
               </button>
             )}
-            <input
-              type="date"
-              className="border border-gray-200 rounded-lg px-2 py-1 text-xs"
-              value={/^\d{4}-/.test(activeDay) ? activeDay : ""}
-              onChange={(e) => e.target.value && selectDay(e.target.value)}
-              title="Ir para uma data"
-            />
+            <button
+              onClick={() => setSelectedDay("all")}
+              className={clsx(
+                "text-xs font-medium px-3 py-1.5 rounded-full border transition-colors",
+                activeDay === "all" ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-600 border-gray-200 hover:border-violet-300"
+              )}
+            >
+              Ver todas
+            </button>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <div className="grid grid-cols-7 gap-2 min-w-[560px]">
+          <div className="grid grid-cols-7 gap-2 min-w-[480px]">
             {weekDays.map((k) => {
               const stat = byDay[k];
               const open = stat ? stat.total - stat.done : 0;
               const selected = activeDay === k;
-              const rel = relativeLabel(k, todayDay);
               const badge = !stat ? null
                 : k < todayDay && open > 0 ? "bg-red-100 text-red-700"
                 : stat.done === stat.total ? "bg-green-100 text-green-700"
@@ -415,15 +398,14 @@ export default function TasksPage() {
                   onClick={() => selectDay(k)}
                   title={stat ? `${stat.total} tarefa(s): ${open} em aberto, ${stat.done} concluída(s)` : "Sem tarefas"}
                   className={clsx(
-                    "flex flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 transition-colors",
+                    "flex flex-col items-center gap-1 rounded-xl border px-1 py-2 transition-colors",
                     selected ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-gray-200 text-gray-700 hover:border-violet-300"
                   )}
                 >
-                  <span className={clsx("text-[11px] font-medium uppercase", selected ? "text-white/80" : "text-gray-400")}>{weekdayShort(k)}</span>
-                  <span className="text-lg font-bold leading-none">{dayNumber(k)}</span>
-                  <span className={clsx("text-[11px] h-4", selected ? "text-white/90 font-semibold" : k === todayDay ? "text-violet-600 font-semibold" : "text-gray-400")}>
-                    {rel ?? ""}
+                  <span className={clsx("text-[11px] font-semibold uppercase", selected ? "text-white/90" : k === todayDay ? "text-violet-600" : "text-gray-400")}>
+                    {relativeLabel(k, todayDay) ?? weekdayShort(k)}
                   </span>
+                  <span className="text-lg font-bold leading-none">{dayNumber(k)}</span>
                   {badge ? (
                     <span className={clsx("min-w-5 text-center text-xs font-bold px-1.5 py-0.5 rounded-full", selected ? "bg-white/25 text-white" : badge)}>
                       {stat!.total}
@@ -436,37 +418,36 @@ export default function TasksPage() {
             })}
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2 flex-wrap mt-3">
-          {(overdueCount > 0 || activeDay === "overdue") && (
-            <button
-              onClick={() => setSelectedDay("overdue")}
-              className={clsx(
-                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                activeDay === "overdue" ? "bg-red-600 text-white border-red-600" : "bg-white text-red-700 border-red-200 hover:bg-red-50"
-              )}
-            >
-              Atrasadas
-              <span className={clsx("min-w-5 text-center text-xs px-1.5 py-0.5 rounded-full font-semibold", activeDay === "overdue" ? "bg-white/25 text-white" : "bg-red-100 text-red-700")}>{overdueCount}</span>
-            </button>
-          )}
-          <button
-            onClick={() => setSelectedDay("all")}
-            className={clsx(
-              "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-              activeDay === "all" ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-700 border-gray-200 hover:border-violet-300"
+      {/* What the board below is showing */}
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-gray-900 capitalize">{dayTitle}</h2>
+          <div className="text-xs text-gray-500 mt-1 space-y-0.5">
+            {activeDay !== "all" && (
+              <p>
+                Aqui: <b className="text-gray-800">{totals.day.total}</b> · {totals.day.pending} pendentes · {totals.day.in_progress} em andamento · {totals.day.completed} concluídas
+              </p>
             )}
-          >
-            Todas as datas
-            <span className={clsx("min-w-5 text-center text-xs px-1.5 py-0.5 rounded-full font-semibold", activeDay === "all" ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500")}>{scoped.length}</span>
-          </button>
+            <p>
+              Total{filterUser ? " da pessoa" : ""}: <b className="text-gray-800">{totals.all.total}</b> · {totals.all.pending} pendentes · {totals.all.in_progress} em andamento · {totals.all.completed} concluídas
+            </p>
+          </div>
         </div>
+        <select
+          className="shrink-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+          value={filterPriority}
+          onChange={(e) => setFilterPriority(e.target.value)}
+        >
+          <option value="">Todas as prioridades</option>
+          <option value="low">Baixa</option>
+          <option value="medium">Média</option>
+          <option value="high">Alta</option>
+          <option value="urgent">Urgente</option>
+        </select>
       </div>
 
-      <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h2 className="text-base font-semibold text-gray-900 capitalize">{dayTitle}</h2>
-        <span className="text-sm text-gray-500">{visibleTasks.length} tarefa{visibleTasks.length === 1 ? "" : "s"}</span>
-      </div>
 
       {loading && <p className="text-sm text-gray-400 text-center py-12">Carregando...</p>}
 
