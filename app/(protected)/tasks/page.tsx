@@ -6,11 +6,9 @@ import TaskBoard from "@/components/tasks/TaskBoard";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskDetail from "@/components/tasks/TaskDetail";
 import TaskForm from "@/components/tasks/TaskForm";
-import { Plus, LayoutGrid, List, CalendarCheck, Check, ChevronRight, ChevronLeft } from "lucide-react";
-import {
-  addDays, dayKeyOf, dayNumber, formatDayLong, formatDayMonth, mondayOf,
-  relativeLabel, todayKey, weekdayShort, weeksBetween,
-} from "@/lib/dayKey";
+import { Plus, LayoutGrid, List, CalendarCheck, Check, ChevronRight } from "lucide-react";
+import { addDays, dayKeyOf, formatDayLong, mondayOf, relativeLabel, todayKey, weeksBetween } from "@/lib/dayKey";
+import DayFilter, { DayMode } from "@/components/tasks/DayFilter";
 import Link from "next/link";
 import clsx from "clsx";
 
@@ -166,10 +164,11 @@ export default function TasksPage() {
     );
   }
 
+  const mode: DayMode = activeDay === "all" ? "all" : activeDay === "overdue" ? "overdue" : "day";
   const dayTitle =
-    activeDay === "all" ? "Todas as datas"
-    : activeDay === "overdue" ? "Atrasadas"
-    : `${relativeLabel(activeDay, todayDay) ? relativeLabel(activeDay, todayDay) + " · " : ""}${formatDayLong(activeDay)}`;
+    mode === "all" ? "Todas as tarefas"
+    : mode === "overdue" ? "Tarefas atrasadas"
+    : (relativeLabel(activeDay, todayDay) ? relativeLabel(activeDay, todayDay) + " · " : "") + formatDayLong(activeDay);
 
   // Auto-refresh so tasks created/updated elsewhere (e.g. by another person,
   // or via the MCP integration) show up without a manual page reload.
@@ -333,110 +332,16 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Who: only for people allowed to see the whole team */}
-      {canViewAll && (
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          {personPill("", "Todos", tasks.length)}
-          {users.map((u) => personPill(u.id, u.name, countByUser[u.id] ?? 0))}
-        </div>
-      )}
-
-      {/* When: week strip, opens on today */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-5">
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <button onClick={() => setWeekOffset((w) => w - 1)} className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50" title="Semana anterior">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button onClick={() => setWeekOffset((w) => w + 1)} className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50" title="Próxima semana">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <span className="text-sm font-semibold text-gray-800">
-            {formatDayMonth(weekDays[0])} a {formatDayMonth(weekDays[6])}
-          </span>
-          {(selectedDay !== null || weekOffset !== 0) && (
-            <button onClick={goToToday} className="text-xs font-medium px-2.5 py-1 rounded-lg text-violet-700 bg-violet-50 hover:bg-violet-100">
-              Hoje
-            </button>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            {(overdueCount > 0 || activeDay === "overdue") && (
-              <button
-                onClick={() => setSelectedDay("overdue")}
-                className={clsx(
-                  "text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors",
-                  activeDay === "overdue" ? "bg-red-600 text-white border-red-600" : "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                )}
-              >
-                {overdueCount} atrasada{overdueCount === 1 ? "" : "s"}
-              </button>
-            )}
-            <button
-              onClick={() => setSelectedDay("all")}
-              className={clsx(
-                "text-xs font-medium px-3 py-1.5 rounded-full border transition-colors",
-                activeDay === "all" ? "bg-violet-600 text-white border-violet-600" : "bg-white text-gray-600 border-gray-200 hover:border-violet-300"
-              )}
-            >
-              Ver todas
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <div className="grid grid-cols-7 gap-2 min-w-[480px]">
-            {weekDays.map((k) => {
-              const stat = byDay[k];
-              const open = stat ? stat.total - stat.done : 0;
-              const selected = activeDay === k;
-              const badge = !stat ? null
-                : k < todayDay && open > 0 ? "bg-red-100 text-red-700"
-                : stat.done === stat.total ? "bg-green-100 text-green-700"
-                : "bg-violet-100 text-violet-700";
-              return (
-                <button
-                  key={k}
-                  onClick={() => selectDay(k)}
-                  title={stat ? `${stat.total} tarefa(s): ${open} em aberto, ${stat.done} concluída(s)` : "Sem tarefas"}
-                  className={clsx(
-                    "flex flex-col items-center gap-1 rounded-xl border px-1 py-2 transition-colors",
-                    selected ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-gray-200 text-gray-700 hover:border-violet-300"
-                  )}
-                >
-                  <span className={clsx("text-[11px] font-semibold uppercase", selected ? "text-white/90" : k === todayDay ? "text-violet-600" : "text-gray-400")}>
-                    {relativeLabel(k, todayDay) ?? weekdayShort(k)}
-                  </span>
-                  <span className="text-lg font-bold leading-none">{dayNumber(k)}</span>
-                  {badge ? (
-                    <span className={clsx("min-w-5 text-center text-xs font-bold px-1.5 py-0.5 rounded-full", selected ? "bg-white/25 text-white" : badge)}>
-                      {stat!.total}
-                    </span>
-                  ) : (
-                    <span className="h-5" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* What the board below is showing */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold text-gray-900 capitalize">{dayTitle}</h2>
-          <div className="text-xs text-gray-500 mt-1 space-y-0.5">
-            {activeDay !== "all" && (
-              <p>
-                Aqui: <b className="text-gray-800">{totals.day.total}</b> · {totals.day.pending} pendentes · {totals.day.in_progress} em andamento · {totals.day.completed} concluídas
-              </p>
-            )}
-            <p>
-              Total{filterUser ? " da pessoa" : ""}: <b className="text-gray-800">{totals.all.total}</b> · {totals.all.pending} pendentes · {totals.all.in_progress} em andamento · {totals.all.completed} concluídas
-            </p>
-          </div>
-        </div>
+      {/* Who + priority */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {canViewAll && (
+          <>
+            {personPill("", "Todos", tasks.length)}
+            {users.map((u) => personPill(u.id, u.name, countByUser[u.id] ?? 0))}
+          </>
+        )}
         <select
-          className="shrink-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+          className="ml-auto border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
           value={filterPriority}
           onChange={(e) => setFilterPriority(e.target.value)}
         >
@@ -446,6 +351,39 @@ export default function TasksPage() {
           <option value="high">Alta</option>
           <option value="urgent">Urgente</option>
         </select>
+      </div>
+
+      {/* When: Por dia / Atrasadas / Todas */}
+      <DayFilter
+        mode={mode}
+        activeDay={activeDay}
+        todayDay={todayDay}
+        weekDays={weekDays}
+        byDay={byDay}
+        overdueCount={overdueCount}
+        allCount={scoped.length}
+        showBackToToday={selectedDay !== null || weekOffset !== 0}
+        onPickDay={selectDay}
+        onPickOverdue={() => setSelectedDay("overdue")}
+        onPickAll={() => setSelectedDay("all")}
+        onWeek={(d) => setWeekOffset((w) => w + d)}
+        onBackToToday={goToToday}
+      />
+
+      {/* What the board below is showing */}
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-gray-900">{dayTitle}</h2>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <span className="text-sm text-gray-500">{totals.day.total} tarefa{totals.day.total === 1 ? "" : "s"}:</span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">{totals.day.pending} pendente{totals.day.pending === 1 ? "" : "s"}</span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700">{totals.day.in_progress} em andamento</span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">{totals.day.completed} concluída{totals.day.completed === 1 ? "" : "s"}</span>
+        </div>
+        {mode !== "all" && (
+          <p className="text-xs text-gray-400 mt-2">
+            Total geral{filterUser ? " da pessoa" : ""}: {totals.all.total} tarefas · {totals.all.pending} pendentes · {totals.all.in_progress} em andamento · {totals.all.completed} concluídas
+          </p>
+        )}
       </div>
 
 
