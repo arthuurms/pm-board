@@ -25,6 +25,23 @@ function todayStr() {
 
 type ViewMode = "board" | "list";
 
+const PRIORITY_RANK: Record<string, number> = { urgent: 3, high: 2, medium: 1, low: 0 };
+
+// Open tasks past their deadline come first (most overdue first, then original priority);
+// everything else keeps the API order (by due date, completed by latest finish).
+function sortLateFirst(list: Task[]): Task[] {
+  const now = Date.now();
+  const group = (t: Task) => (t.status === "completed" ? 2 : new Date(t.dueDate).getTime() < now ? 0 : 1);
+  return [...list].sort((a, b) => {
+    const ga = group(a), gb = group(b);
+    if (ga !== gb) return ga - gb;
+    if (ga === 0) {
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime() || (PRIORITY_RANK[b.priority] ?? 0) - (PRIORITY_RANK[a.priority] ?? 0);
+    }
+    return 0;
+  });
+}
+
 export default function TasksPage() {
   const { data: session } = useSession();
   const currentUser = session?.user as { id?: string; role?: string; name?: string } | undefined;
@@ -118,16 +135,24 @@ export default function TasksPage() {
     return map;
   }, [scoped]);
 
-  const overdueCount = useMemo(
-    () => scoped.filter((t) => t.status !== "completed" && dayKeyOf(t.dueDate) < todayDay).length,
+  // An open task whose due day is before today never stays behind: it follows the person into "today".
+  const carriedOver = useMemo(
+    () => scoped.filter((t) => t.status !== "completed" && dayKeyOf(t.dueDate) < todayDay),
     [scoped, todayDay]
   );
 
+  const overdueCount = carriedOver.length;
+
   const visibleTasks = useMemo(() => {
-    if (activeDay === "all") return scoped;
-    if (activeDay === "overdue") return scoped.filter((t) => t.status !== "completed" && dayKeyOf(t.dueDate) < todayDay);
-    return scoped.filter((t) => dayKeyOf(t.dueDate) === activeDay);
-  }, [scoped, activeDay, todayDay]);
+    let list: Task[];
+    if (activeDay === "all") list = scoped;
+    else if (activeDay === "overdue") list = carriedOver;
+    else {
+      list = scoped.filter((t) => dayKeyOf(t.dueDate) === activeDay);
+      if (activeDay === todayDay) list = [...carriedOver, ...list];
+    }
+    return sortLateFirst(list);
+  }, [scoped, carriedOver, activeDay, todayDay]);
 
   const countByUser = useMemo(() => {
     const m: Record<string, number> = {};
@@ -379,6 +404,11 @@ export default function TasksPage() {
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700">{totals.day.in_progress} em andamento</span>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">{totals.day.completed} concluída{totals.day.completed === 1 ? "" : "s"}</span>
         </div>
+        {mode === "day" && activeDay === todayDay && carriedOver.length > 0 && (
+          <p className="text-xs font-semibold text-red-600 mt-2">
+            Inclui {carriedOver.length} tarefa{carriedOver.length === 1 ? "" : "s"} atrasada{carriedOver.length === 1 ? "" : "s"} de dias anteriores, no topo, com prioridade máxima.
+          </p>
+        )}
         {mode !== "all" && (
           <p className="text-xs text-gray-400 mt-2">
             Total geral{filterUser ? " da pessoa" : ""}: {totals.all.total} tarefas · {totals.all.pending} pendentes · {totals.all.in_progress} em andamento · {totals.all.completed} concluídas

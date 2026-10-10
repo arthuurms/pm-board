@@ -111,6 +111,11 @@ export default function DayFilter({
                     <span className={clsx("text-xs font-semibold", selected ? "text-white" : tone)}>
                       {stat ? `${stat.total} ${stat.total === 1 ? "tarefa" : "tarefas"}` : "livre"}
                     </span>
+                    {isToday && overdueCount > 0 && (
+                      <span className={clsx("text-[11px] font-bold", selected ? "text-white" : "text-red-600")}>
+                        +{overdueCount} {overdueCount === 1 ? "atrasada" : "atrasadas"}
+                      </span>
+                    )}
                   </button>
                 );
               })}

@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { Task } from "@/types";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2, ThumbsUp, Paperclip } from "lucide-react";
+import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2, ThumbsUp, Paperclip, AlertTriangle } from "lucide-react";
 import clsx from "clsx";
+import { dayKeyOf } from "@/lib/dayKey";
 
 interface Props {
   task: Task;
@@ -23,6 +24,15 @@ interface Props {
 function isOverdue(task: Task) {
   if (task.status === "completed") return false;
   return new Date(task.dueDate) < new Date();
+}
+
+// "há 3 dias" / "há 5h" / "há 20min" for an open task past its deadline.
+function overdueLabel(dueDate: string): string {
+  const dueMs = new Date(dueDate).getTime();
+  const days = Math.round((new Date(dayKeyOf(Date.now()) + "T12:00:00Z").getTime() - new Date(dayKeyOf(dueMs) + "T12:00:00Z").getTime()) / 86400000);
+  if (days >= 1) return `há ${days} dia${days > 1 ? "s" : ""}`;
+  const mins = Math.max(1, Math.round((Date.now() - dueMs) / 60000));
+  return mins >= 60 ? `há ${Math.floor(mins / 60)}h` : `há ${mins}min`;
 }
 
 function fmtDate(d: string) {
@@ -191,10 +201,17 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
         className={clsx(
           "bg-white rounded-xl border p-4 hover:shadow-md transition-shadow cursor-pointer select-none",
           task.isRework && "border-l-4 border-l-orange-400",
-          overdue && !task.isRework && "border-l-4 border-l-red-400"
+          overdue && !task.isRework && "border-l-4 border-l-red-500",
+          overdue && "border-red-300"
         )}
         onClick={onClick}
       >
+        {overdue && (
+          <div className="flex items-center gap-1.5 -mt-1 mb-2 px-2 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-bold uppercase tracking-wide">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            Atrasada {overdueLabel(task.dueDate)}
+          </div>
+        )}
         {/* drag handle + title */}
         <div className="flex items-start gap-1 mb-2">
           <GripVertical className="w-3.5 h-3.5 text-gray-300 mt-0.5 shrink-0" />
@@ -216,7 +233,13 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
         </div>
 
         <div className="flex flex-wrap gap-2 mb-3">
-          <PriorityBadge priority={task.priority} />
+          {overdue ? (
+            <span title={`Prioridade original: ${task.priority}. Tarefa atrasada vale como prioridade máxima.`}>
+              <PriorityBadge priority="urgent" />
+            </span>
+          ) : (
+            <PriorityBadge priority={task.priority} />
+          )}
           <StatusBadge status={task.status} />
           {task.tag && (
             <span
