@@ -19,6 +19,8 @@ interface Props {
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
   onClick: () => void;
+  // Finished cards on a day view: the day's own are outlined in green, the ones followed from other days are dimmed.
+  emphasis?: "highlight" | "muted";
 }
 
 function isOverdue(task: Task) {
@@ -172,7 +174,7 @@ function EditReworkReason({ taskTitle, initialReason, onSave, onCancel }: {
   );
 }
 
-export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onEditReworkReason, onApprove, currentUserId, isAdmin, onEdit, onDelete, onClick }: Props) {
+export default function TaskCard({ task, permissions, onStatusChange, onMarkRework, onRemoveRework, onEditReworkReason, onApprove, currentUserId, isAdmin, onEdit, onDelete, onClick, emphasis }: Props) {
   const overdue = isOverdue(task);
   const canApprove = task.status === "completed" && !task.approved && currentUserId === task.creatorId;
   // Only the assignee (or an admin) is actually on the hook to move the task through
@@ -202,7 +204,9 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           "bg-white rounded-xl border p-4 hover:shadow-md transition-shadow cursor-pointer select-none",
           task.isRework && "border-l-4 border-l-orange-400",
           overdue && !task.isRework && "border-l-4 border-l-red-500",
-          overdue && "border-red-300"
+          overdue && "border-red-300",
+          emphasis === "highlight" && "ring-2 ring-green-400 border-green-300",
+          emphasis === "muted" && "opacity-60"
         )}
         onClick={onClick}
       >
@@ -210,6 +214,12 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
           <div className="flex items-center gap-1.5 -mt-1 mb-2 px-2 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-bold uppercase tracking-wide">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
             Atrasada {overdueLabel(task.dueDate)}
+          </div>
+        )}
+        {!overdue && task.status === "in_progress" && dayKeyOf(task.dueDate) > dayKeyOf(Date.now()) && (
+          <div className="flex items-center gap-1.5 -mt-1 mb-2 px-2 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-xs font-bold uppercase tracking-wide">
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            Em andamento · vence {fmtDate(task.dueDate)}
           </div>
         )}
         {/* drag handle + title */}

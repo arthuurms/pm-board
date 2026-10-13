@@ -16,6 +16,7 @@ interface Props {
   onTaskClick: (task: Task) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
+  doneOfDayIds?: Set<string>;
 }
 
 const COLUMNS = [
@@ -31,7 +32,7 @@ const ALLOWED: Record<string, Record<string, string>> = {
   completed:   { pending: "pending", in_progress: "in_progress" },
 };
 
-export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRework, onRemoveRework, onEditReworkReason, onApprove, currentUserId, isAdmin, onTaskClick, onEdit, onDelete }: Props) {
+export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRework, onRemoveRework, onEditReworkReason, onApprove, currentUserId, isAdmin, onTaskClick, onEdit, onDelete, doneOfDayIds }: Props) {
   function handleDragEnd(result: DropResult) {
     const { source, destination, draggableId } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
@@ -92,6 +93,7 @@ export default function TaskBoard({ tasks, permissions, onStatusChange, onMarkRe
                             className={snapshot.isDragging ? "rotate-1 shadow-xl" : ""}
                           >
                             <TaskCard
+                              emphasis={doneOfDayIds && task.status === "completed" ? (doneOfDayIds.has(task.id) ? "highlight" : "muted") : undefined}
                               task={task}
                               permissions={permissions}
                               onStatusChange={onStatusChange}

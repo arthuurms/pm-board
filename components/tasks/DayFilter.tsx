@@ -12,6 +12,7 @@ interface Props {
   weekDays: string[];
   byDay: Record<string, { total: number; done: number }>;
   overdueCount: number;
+  followingCount: number;
   allCount: number;
   showBackToToday: boolean;
   onPickDay: (key: string) => void;
@@ -22,7 +23,7 @@ interface Props {
 }
 
 export default function DayFilter({
-  mode, activeDay, todayDay, weekDays, byDay, overdueCount, allCount, showBackToToday,
+  mode, activeDay, todayDay, weekDays, byDay, overdueCount, followingCount, allCount, showBackToToday,
   onPickDay, onPickOverdue, onPickAll, onWeek, onBackToToday,
 }: Props) {
   function tab(active: boolean, tone: "violet" | "red", onClick: () => void, icon: React.ReactNode, label: string, count?: number) {
@@ -111,9 +112,12 @@ export default function DayFilter({
                     <span className={clsx("text-xs font-semibold", selected ? "text-white" : tone)}>
                       {stat ? `${stat.total} ${stat.total === 1 ? "tarefa" : "tarefas"}` : "livre"}
                     </span>
-                    {isToday && overdueCount > 0 && (
-                      <span className={clsx("text-[11px] font-bold", selected ? "text-white" : "text-red-600")}>
-                        +{overdueCount} {overdueCount === 1 ? "atrasada" : "atrasadas"}
+                    {isToday && overdueCount + followingCount > 0 && (
+                      <span
+                        title={`${overdueCount} atrasada(s) e ${followingCount} em andamento de outros dias`}
+                        className={clsx("text-[11px] font-bold", selected ? "text-white" : overdueCount > 0 ? "text-red-600" : "text-yellow-700")}
+                      >
+                        +{overdueCount + followingCount} seguindo
                       </span>
                     )}
                   </button>

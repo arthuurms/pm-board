@@ -25,6 +25,11 @@ function todayStr() {
 
 type ViewMode = "board" | "list";
 
+// Finished tasks keep accompanying the days for a while: a day shows the ones finished in the
+// last RECENT_DONE_DAYS days up to it (the day's own are highlighted).
+const RECENT_DONE_DAYS = 7;
+const doneDayOf = (t: Task) => dayKeyOf(t.completedAt ?? t.dueDate);
+
 const PRIORITY_RANK: Record<string, number> = { urgent: 3, high: 2, medium: 1, low: 0 };
 
 // Open tasks past their deadline come first (most overdue first, then original priority);
@@ -128,12 +133,15 @@ export default function TasksPage() {
     const map: Record<string, { total: number; done: number }> = {};
     for (const t of scoped) {
       const k = dayKeyOf(t.dueDate);
+      if (t.status === "in_progress" && k < todayDay) continue; // keeps following the person, see "following"/"visibleTasks"
       const e = (map[k] ??= { total: 0, done: 0 });
       e.total++;
       if (t.status === "completed") e.done++;
     }
     return map;
-  }, [scoped]);
+  }, [scoped, todayDay]);
+
+  const mode: DayMode = activeDay === "all" ? "all" : activeDay === "overdue" ? "overdue" : "day";
 
   // An open task whose due day is before today never stays behind: it follows the person into "today".
   const carriedOver = useMemo(
@@ -143,16 +151,54 @@ export default function TasksPage() {
 
   const overdueCount = carriedOver.length;
 
+  // A task being worked on follows the person every day until it is finished, even when it is not due yet.
+  const following = useMemo(
+    () => scoped.filter((t) => t.status === "in_progress" && dayKeyOf(t.dueDate) > todayDay),
+    [scoped, todayDay]
+  );
+
+  // Completed tasks that belong to the chosen day: due on it or finished on it.
+  const isDoneOfDay = useCallback(
+    (t: Task) => t.status === "completed" && (dayKeyOf(t.dueDate) === activeDay || doneDayOf(t) === activeDay),
+    [activeDay]
+  );
+
   const visibleTasks = useMemo(() => {
     let list: Task[];
     if (activeDay === "all") list = scoped;
     else if (activeDay === "overdue") list = carriedOver;
     else {
-      list = scoped.filter((t) => dayKeyOf(t.dueDate) === activeDay);
-      if (activeDay === todayDay) list = [...carriedOver, ...list];
+      // In-progress tasks of a past day are not left behind there: they live in "today".
+      const dueThatDay = scoped.filter(
+        (t) => dayKeyOf(t.dueDate) === activeDay && !(t.status === "in_progress" && activeDay < todayDay)
+      );
+      // Finished tasks from the previous days keep accompanying this one.
+      const windowStart = addDays(activeDay, -(RECENT_DONE_DAYS - 1));
+      const followedDone = scoped.filter(
+        (t) => t.status === "completed" && dayKeyOf(t.dueDate) !== activeDay && doneDayOf(t) >= windowStart && doneDayOf(t) <= activeDay
+      );
+      list = activeDay === todayDay ? [...carriedOver, ...following, ...dueThatDay, ...followedDone] : [...dueThatDay, ...followedDone];
     }
-    return sortLateFirst(list);
-  }, [scoped, carriedOver, activeDay, todayDay]);
+    const sorted = sortLateFirst(list);
+    if (mode !== "day") return sorted;
+    // The day's own finished tasks first, the followed ones after them.
+    return [...sorted].sort((a, b) => Number(a.status === "completed" && !isDoneOfDay(a)) - Number(b.status === "completed" && !isDoneOfDay(b)));
+  }, [scoped, carriedOver, following, activeDay, todayDay, mode, isDoneOfDay]);
+
+  // Highlighted (day's own) vs dimmed (followed) finished cards; only meaningful on a day view.
+  const doneOfDayIds = useMemo(
+    () => (mode === "day" ? new Set(visibleTasks.filter(isDoneOfDay).map((t) => t.id)) : undefined),
+    [visibleTasks, mode, isDoneOfDay]
+  );
+  const followedDoneCount = doneOfDayIds ? visibleTasks.filter((t) => t.status === "completed").length - doneOfDayIds.size : 0;
+
+  // On a past day: how many in-progress tasks of that day moved on to today.
+  const movedToToday = useMemo(
+    () => (/^[0-9]{4}-/.test(activeDay) && activeDay < todayDay
+      ? scoped.filter((t) => t.status === "in_progress" && dayKeyOf(t.dueDate) === activeDay).length
+      : 0),
+    [scoped, activeDay, todayDay]
+  );
 
   const countByUser = useMemo(() => {
     const m: Record<string, number> = {};
@@ -189,7 +235,6 @@ export default function TasksPage() {
     );
   }
 
-  const mode: DayMode = activeDay === "all" ? "all" : activeDay === "overdue" ? "overdue" : "day";
   const dayTitle =
     mode === "all" ? "Todas as tarefas"
     : mode === "overdue" ? "Tarefas atrasadas"
@@ -386,6 +431,7 @@ export default function TasksPage() {
         weekDays={weekDays}
         byDay={byDay}
         overdueCount={overdueCount}
+        followingCount={following.length}
         allCount={scoped.length}
         showBackToToday={selectedDay !== null || weekOffset !== 0}
         onPickDay={selectDay}
@@ -399,14 +445,29 @@ export default function TasksPage() {
       <div className="mb-4">
         <h2 className="text-lg font-bold text-gray-900">{dayTitle}</h2>
         <div className="flex flex-wrap items-center gap-2 mt-2">
-          <span className="text-sm text-gray-500">{totals.day.total} tarefa{totals.day.total === 1 ? "" : "s"}:</span>
+          <span className="text-sm text-gray-500">{totals.day.total - followedDoneCount} tarefa{totals.day.total - followedDoneCount === 1 ? "" : "s"}:</span>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700">{totals.day.pending} pendente{totals.day.pending === 1 ? "" : "s"}</span>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700">{totals.day.in_progress} em andamento</span>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">{totals.day.completed} concluída{totals.day.completed === 1 ? "" : "s"}</span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">{doneOfDayIds ? doneOfDayIds.size : totals.day.completed} concluída{(doneOfDayIds ? doneOfDayIds.size : totals.day.completed) === 1 ? "" : "s"}{doneOfDayIds ? " do dia" : ""}</span>
         </div>
-        {mode === "day" && activeDay === todayDay && carriedOver.length > 0 && (
-          <p className="text-xs font-semibold text-red-600 mt-2">
-            Inclui {carriedOver.length} tarefa{carriedOver.length === 1 ? "" : "s"} atrasada{carriedOver.length === 1 ? "" : "s"} de dias anteriores, no topo, com prioridade máxima.
+        {mode === "day" && activeDay === todayDay && (carriedOver.length > 0 || following.length > 0) && (
+          <p className="text-xs text-gray-600 mt-2">
+            No topo, de outros dias:
+            {carriedOver.length > 0 && <span className="font-semibold text-red-600"> {carriedOver.length} atrasada{carriedOver.length === 1 ? "" : "s"}</span>}
+            {carriedOver.length > 0 && following.length > 0 && " e"}
+            {following.length > 0 && <span className="font-semibold text-yellow-700"> {following.length} em andamento</span>}
+            . Elas acompanham você até serem concluídas.
+          </p>
+        )}
+        {followedDoneCount > 0 && (
+          <p className="text-xs text-gray-500 mt-1">
+            Concluídas: <span className="font-semibold text-green-700">contorno verde</span> = do dia, <span className="font-semibold">esmaecidas</span> = dos últimos {RECENT_DONE_DAYS} dias.
+          </p>
+        )}
+        {movedToToday > 0 && (
+          <p className="text-xs font-semibold text-yellow-700 mt-2">
+            {movedToToday} tarefa{movedToToday === 1 ? "" : "s"} em andamento deste dia seguiu{movedToToday === 1 ? "" : "ram"} para Hoje.{" "}
+            <button onClick={goToToday} className="underline hover:opacity-80">Ver em Hoje</button>
           </p>
         )}
         {mode !== "all" && (
@@ -427,6 +488,7 @@ export default function TasksPage() {
 
       {!loading && view === "board" && (
         <TaskBoard
+          doneOfDayIds={doneOfDayIds}
           tasks={visibleTasks}
           permissions={permissions}
           onStatusChange={changeStatus}
@@ -446,6 +508,7 @@ export default function TasksPage() {
         <div className="space-y-3">
           {visibleTasks.map((t) => (
             <TaskCard
+              emphasis={doneOfDayIds && t.status === "completed" ? (doneOfDayIds.has(t.id) ? "highlight" : "muted") : undefined}
               key={t.id}
               task={t}
               permissions={permissions}
