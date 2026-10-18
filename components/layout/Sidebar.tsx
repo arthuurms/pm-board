@@ -17,6 +17,7 @@ import {
   ChevronRight,
   CalendarCheck,
   CalendarClock,
+  BookOpen,
   Target,
   Sun,
   Moon,
@@ -34,6 +35,7 @@ const NAV_ALL = [
   { href: "/incidents", label: "Incidentes", icon: AlertTriangle, adminOnly: false, permission: null },
   { href: "/qualidade", label: "Qualidade de Serviço", icon: ShieldAlert, adminOnly: false, permission: "manage_quality_incidents" },
   { href: "/performance", label: "Análise de Desempenho", icon: BarChart2, adminOnly: false, permission: null },
+  { href: "/como-funciona", label: "Como funciona", icon: BookOpen, adminOnly: false, permission: null },
   { href: "/users", label: "Usuários & Permissões", icon: Users, adminOnly: true, permission: null },
 ];
 
