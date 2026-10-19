@@ -28,7 +28,7 @@ const GREETING: Message = {
   text:
     "Oi! Cole aqui o pedido do jeito que você escreveria para uma pessoa e eu monto a tarefa. Por exemplo:\n\n" +
     "passar tarefa para o Breno para o dia 18.10 até as 23:00\nadicionar produtos no México novo\nverificar o preço, prioridade alta\n\n" +
-    "Eu entendo o responsável, o dia, o horário, a prioridade e o país. Antes de criar, você confere tudo no cartão.",
+    "Eu entendo o responsável, o dia, o horário, a prioridade e o país. Quando entendo tudo, já crio a tarefa. Se faltar algo, mostro um cartão para você completar.",
 };
 
 export default function AssistentePage() {
@@ -63,49 +63,74 @@ export default function AssistentePage() {
     setMessages((prev) => [...prev, { ...m, id: nextId.current++ }]);
   }, []);
 
-  function send() {
-    const text = input.trim();
-    if (!text) return;
+  // Sends the task to the server. Returns true when it was created.
+  async function createFrom(d: Draft): Promise<boolean> {
+    setCreating(true);
     setError("");
-    const result = parseTaskMessage(text, { users, tags }, draft ?? undefined);
-    setDraft(result.draft);
-    push({ role: "user", text });
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: d.title.trim(),
+          description: d.description.trim() || null,
+          priority: d.priority,
+          dueDate: dueToIso(d.due),
+          assigneeId: d.assigneeId,
+          tagId: d.tagId || null,
+        }),
+      });
+      if (!res.ok) {
+        setError((await res.json().catch(() => ({}))).error || "Não consegui criar a tarefa. Tente de novo.");
+        return false;
+      }
+    } catch {
+      setError("Sem conexão com o servidor. Tente de novo.");
+      return false;
+    } finally {
+      setCreating(false);
+    }
+    const who = users.find((u) => u.id === d.assigneeId)?.name ?? "o responsável";
     push({
       role: "bot",
-      text: result.isFollowUp ? "Ajustei o cartão." : "Entendi! Montei a tarefa abaixo. Confira e clique em Criar tarefa.",
+      text: `Pronto! Criei a tarefa "${d.title.trim()}" para ${who}, com prazo ${formatDue(d.due)}. Ela já aparece no painel de Tarefas dele.`,
+      createdTaskTitle: d.title.trim(),
+    });
+    return true;
+  }
+
+  async function send() {
+    const text = input.trim();
+    if (!text || creating) return;
+    setError("");
+    const result = parseTaskMessage(text, { users, tags }, draft ?? undefined);
+    push({ role: "user", text });
+    setInput("");
+
+    // New request understood without any doubt (nothing missing, no warning): create it right away.
+    const complete = !!result.draft.title.trim() && !!result.draft.assigneeId && !!result.draft.due;
+    if (!result.isFollowUp && complete && result.notes.length === 0) {
+      const ok = await createFrom(result.draft);
+      if (ok) {
+        setDraft(null);
+      } else {
+        setDraft(result.draft);
+        push({ role: "bot", text: "Não consegui criar a tarefa agora. Confira o cartão e clique em Criar tarefa." });
+      }
+      return;
+    }
+
+    setDraft(result.draft);
+    push({
+      role: "bot",
+      text: result.isFollowUp ? "Ajustei o cartão." : "Montei a tarefa abaixo, mas preciso que você confira. Clique em Criar tarefa quando estiver certo.",
       notes: result.notes,
     });
-    setInput("");
   }
 
   async function create() {
     if (!draft) return;
-    setCreating(true);
-    setError("");
-    const res = await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: draft.title.trim(),
-        description: draft.description.trim() || null,
-        priority: draft.priority,
-        dueDate: dueToIso(draft.due),
-        assigneeId: draft.assigneeId,
-        tagId: draft.tagId || null,
-      }),
-    });
-    setCreating(false);
-    if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error || "Não consegui criar a tarefa. Tente de novo.");
-      return;
-    }
-    const who = users.find((u) => u.id === draft.assigneeId)?.name ?? "o responsável";
-    push({
-      role: "bot",
-      text: `Pronto! Criei a tarefa "${draft.title.trim()}" para ${who}, com prazo ${formatDue(draft.due)}. Ela já aparece no painel de Tarefas dele.`,
-      createdTaskTitle: draft.title.trim(),
-    });
-    setDraft(null);
+    if (await createFrom(draft)) setDraft(null);
   }
 
   function discard() {

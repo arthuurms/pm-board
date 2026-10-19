@@ -101,8 +101,8 @@ export default function ComoFuncionaPage() {
             </div>
             <p className="text-sm text-gray-600 leading-relaxed">
               Abra <Link href="/assistente" className="text-violet-700 font-medium hover:underline">Assistente</Link> no menu e cole o pedido do jeito que você escreveria, com o responsável,
-              o dia, o horário e a prioridade no meio do texto. O robô monta um cartão com tudo preenchido; você confere e clica em <b>Criar tarefa</b>.
-              Se faltar o responsável ou o prazo, ele avisa, e você completa no cartão ou escrevendo no chat (ex: &quot;amanhã 18h&quot;).
+              o dia, o horário e a prioridade no meio do texto. Quando o robô entende tudo, ele <b>cria a tarefa na hora</b>.
+              Se faltar o responsável ou o prazo, ele mostra um cartão com o que entendeu e avisa o que falta: você completa no cartão ou escrevendo no chat (ex: &quot;amanhã 18h&quot;) e clica em <b>Criar tarefa</b>.
             </p>
           </div>
 

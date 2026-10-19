@@ -140,7 +140,7 @@ export default function CompleteTaskModal({ task, onClose, onDone }: Props) {
           ) : (
             <>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Para concluir é <b className="text-gray-900">obrigatório enviar a print</b> da tarefa feita. Ela fica salva na tarefa e vai para o Discord.
+                Para concluir é <b className="text-gray-900">obrigatório enviar a print</b> da tarefa feita. Ela será revisada.
               </p>
 
               {!file && !preparing && (
