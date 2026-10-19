@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { Task, User } from "@/types";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskDetail from "@/components/tasks/TaskDetail";
+import CompleteTaskModal from "@/components/tasks/CompleteTaskModal";
 import { RotateCcw } from "lucide-react";
 
 export default function ReworkPage() {
@@ -14,6 +15,7 @@ export default function ReworkPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [completing, setCompleting] = useState<Task | null>(null);
   const [filterUser, setFilterUser] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,12 @@ export default function ReworkPage() {
   }, [load]);
 
   async function changeStatus(taskId: string, newStatus: string) {
+    // Completing needs the proof screenshot: the pop-up collects it and calls /complete itself.
+    if (newStatus === "completed") {
+      const t = tasks.find((x) => x.id === taskId);
+      if (t) setCompleting(t);
+      return;
+    }
     await fetch(`/api/tasks/${taskId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -125,6 +133,13 @@ export default function ReworkPage() {
           )}
           {tasks.length === 0 && <p className="text-sm text-gray-400 text-center py-12">Nenhuma tarefa de retrabalho</p>}
         </>
+      )}
+      {completing && (
+        <CompleteTaskModal
+          task={completing}
+          onClose={() => setCompleting(null)}
+          onDone={() => { setCompleting(null); load(); }}
+        />
       )}
       {selectedTask && <TaskDetail task={selectedTask} onClose={() => setSelectedTask(null)} />}
     </div>

@@ -6,6 +6,7 @@ import TaskBoard from "@/components/tasks/TaskBoard";
 import TaskCard from "@/components/tasks/TaskCard";
 import TaskDetail from "@/components/tasks/TaskDetail";
 import TaskForm from "@/components/tasks/TaskForm";
+import CompleteTaskModal from "@/components/tasks/CompleteTaskModal";
 import { Plus, LayoutGrid, List, CalendarCheck, Check, ChevronRight } from "lucide-react";
 import { addDays, dayKeyOf, formatDayLong, mondayOf, relativeLabel, todayKey, weeksBetween } from "@/lib/dayKey";
 import DayFilter, { DayMode } from "@/components/tasks/DayFilter";
@@ -57,6 +58,7 @@ export default function TasksPage() {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [view, setView] = useState<ViewMode>("board");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [completing, setCompleting] = useState<Task | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [filterUser, setFilterUser] = useState<string>("");
@@ -248,6 +250,12 @@ export default function TasksPage() {
   }, [load]);
 
   async function changeStatus(taskId: string, newStatus: string) {
+    // Completing needs the proof screenshot: the pop-up collects it and calls /complete itself.
+    if (newStatus === "completed") {
+      const t = tasks.find((x) => x.id === taskId);
+      if (t) setCompleting(t);
+      return;
+    }
     await fetch(`/api/tasks/${taskId}/status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -527,6 +535,13 @@ export default function TasksPage() {
         </div>
       )}
 
+      {completing && (
+        <CompleteTaskModal
+          task={completing}
+          onClose={() => setCompleting(null)}
+          onDone={() => { setCompleting(null); load(); }}
+        />
+      )}
       {selectedTask && (
         <TaskDetail task={selectedTask} onClose={() => { setSelectedTask(null); load(); }} />
       )}

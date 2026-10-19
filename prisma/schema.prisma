@@ -47,6 +47,8 @@ model Task {
   discordMessageId String? // Discord message posted on completion, edited when approved
   attachmentUrl   String? // file attached to the task, stored in Vercel Blob
   attachmentName  String?
+  proofUrl        String? // screenshot of the finished work: required to complete the task (Vercel Blob)
+  proofName       String?
 
   dueDate     DateTime
   startedAt   DateTime?

@@ -9,6 +9,7 @@ type TaskEmbedData = {
   onTime: boolean | null;
   isRework: boolean;
   reworkCount: number;
+  proofUrl?: string | null; // screenshot required to complete the task, shown inside the Discord message
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -83,6 +84,7 @@ function buildEmbed(task: TaskEmbedData, analysis: "pending" | "approved") {
     description: task.description || "_Sem descrição_",
     color: analysis === "approved" ? 0x22c55e : onTime ? 0x3b82f6 : 0xef4444,
     fields,
+    image: task.proofUrl ? { url: task.proofUrl } : undefined,
     footer: {
       text: analysis === "approved"
         ? "Aprovada pelo solicitante."

@@ -33,7 +33,7 @@ const FIELDS = [
 const STATUS = [
   { label: "Pendente", color: "bg-gray-100 text-gray-700", text: "Ainda não começou." },
   { label: "Em andamento", color: "bg-yellow-100 text-yellow-700", text: "O responsável já está fazendo." },
-  { label: "Concluída", color: "bg-green-100 text-green-700", text: "Terminou. O sistema registra se foi dentro do prazo." },
+  { label: "Concluída", color: "bg-green-100 text-green-700", text: "Terminou, com a print anexada. O sistema registra se foi dentro do prazo." },
 ];
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
@@ -92,8 +92,20 @@ export default function ComoFuncionaPage() {
         </div>
       </Section>
 
-      <Section title="Como o robô monta e envia" subtitle="Existem três jeitos de uma tarefa nascer. Nos três, ela cai direto no painel do responsável.">
+      <Section title="Como o robô monta e envia" subtitle="Existem quatro jeitos de uma tarefa nascer. Em todos, ela cai direto no painel do responsável.">
         <div className="space-y-3">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Bot className="w-4 h-4 text-violet-600" />
+              <p className="font-semibold text-gray-900 text-sm">Pelo chat do Clickfy (Assistente)</p>
+            </div>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Abra <Link href="/assistente" className="text-violet-700 font-medium hover:underline">Assistente</Link> no menu e cole o pedido do jeito que você escreveria, com o responsável,
+              o dia, o horário e a prioridade no meio do texto. O robô monta um cartão com tudo preenchido; você confere e clica em <b>Criar tarefa</b>.
+              Se faltar o responsável ou o prazo, ele avisa, e você completa no cartão ou escrevendo no chat (ex: &quot;amanhã 18h&quot;).
+            </p>
+          </div>
+
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
             <div className="flex items-center gap-2 mb-2">
               <Bot className="w-4 h-4 text-violet-600" />
@@ -162,7 +174,10 @@ export default function ComoFuncionaPage() {
         </div>
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 space-y-3 text-sm text-gray-600 leading-relaxed">
           <p><b className="text-gray-900">Quem move:</b> o responsável pela tarefa (ou um admin). Quem só pediu a tarefa acompanha, mas não arrasta.</p>
-          <p><b className="text-gray-900">Quando conclui:</b> o Discord avisa e marca quem pediu a tarefa.</p>
+          <p>
+            <b className="text-gray-900">Para concluir:</b> é <b>obrigatório anexar a print</b> da tarefa feita (clique, arraste a imagem ou cole com Ctrl+V).
+            Sem a print a tarefa não conclui. Ela fica salva na tarefa (botão &quot;Ver print&quot;) e vai para o Discord junto com o aviso, que marca quem pediu a tarefa.
+          </p>
           <p>
             <b className="text-gray-900">Conferência:</b> quem pediu clica em <b>Tarefa correta</b> para aprovar, ou em{" "}
             <b className="inline-flex items-center gap-1"><RotateCcw className="w-3 h-3" />Retrabalho</b>, escrevendo o motivo. No retrabalho a tarefa volta para Pendente
@@ -186,6 +201,13 @@ export default function ComoFuncionaPage() {
             </summary>
             <p className="text-sm text-gray-600 mt-2 leading-relaxed">
               Porque o prazo passou e ela ainda está aberta. Para não ser esquecida, vira a primeira da lista. Ao concluir, ela volta ao normal.
+            </p>
+          </details>
+          <details className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold text-gray-900">Não consigo concluir a tarefa</summary>
+            <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+              Para concluir é preciso anexar a print do que foi feito. Ao clicar em Concluir (ou arrastar para a coluna Concluída) abre uma janela: escolha a imagem, arraste ou cole com Ctrl+V.
+              O botão só libera depois que a print estiver lá.
             </p>
           </details>
           <details className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3">

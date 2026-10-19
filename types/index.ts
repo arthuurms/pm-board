@@ -42,6 +42,8 @@ export interface Task {
   approvedAt?: string | null;
   attachmentUrl?: string | null;
   attachmentName?: string | null;
+  proofUrl?: string | null;
+  proofName?: string | null;
   tagId?: string | null;
   tag?: Tag | null;
   dueDate: string;

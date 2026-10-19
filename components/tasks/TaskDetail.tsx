@@ -43,6 +43,15 @@ export default function TaskDetail({ task, onClose }: Props) {
                 <Paperclip className="w-3.5 h-3.5" /> {task.attachmentName || "Arquivo anexado"}
               </a>
             )}
+            {task.proofUrl && (
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-gray-500 mb-1">Print da conclusão</p>
+                <a href={task.proofUrl} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={task.proofUrl} alt="Print da tarefa concluída" className="max-h-64 rounded-lg border border-gray-200" />
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 flex-wrap">

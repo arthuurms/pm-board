@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { hasPermission } from "@/lib/permissions";
-import { notifyTaskCompleted, notifyTaskApproved } from "@/lib/discord";
+import { notifyTaskApproved } from "@/lib/discord";
 
 /**
  * PATCH /api/tasks/[id]/status
@@ -12,7 +12,8 @@ import { notifyTaskCompleted, notifyTaskApproved } from "@/lib/discord";
  * This is the central endpoint for all task status transitions.
  * Permission check:
  *   pending → in_progress  requires "move_in_progress"
- *   * → completed          requires "move_completed"
+ *   * → completed          NOT handled here: rejected with 400 (completing needs the proof screenshot,
+ *                          see POST /api/tasks/[id]/complete)
  *   mark as rework         requires "mark_rework"
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -38,14 +39,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!allowed) return NextResponse.json({ error: "Sem permissão para mover para Em andamento" }, { status: 403 });
   }
 
-  if (status === "completed") {
-    const allowed = await hasPermission(userId, "move_completed");
-    if (!allowed) return NextResponse.json({ error: "Sem permissão para mover para Concluída" }, { status: 403 });
+  // Completing needs the proof screenshot, which only POST /api/tasks/[id]/complete accepts.
+  // Rejecting it here means no client (or hand-made request) can complete a task without the print.
+  if (status === "completed" && task.status !== "completed") {
+    return NextResponse.json(
+      { error: "Para concluir a tarefa é obrigatório enviar a print do que foi feito." },
+      { status: 400 }
+    );
   }
 
   const now = new Date();
   const updateData: Record<string, unknown> = {};
-  let justCompleted = false;
   let justApproved = false;
 
   if (status && status !== task.status) {
@@ -55,19 +59,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       updateData.startedAt = now;
     }
 
-    if (status === "completed") {
-      updateData.completedAt = now;
-      // Automatically determine if delivery was on time
-      updateData.onTime = now <= new Date(task.dueDate);
-      justCompleted = true;
-    }
-
     if (status === "pending") {
-      // Reopening: clear completion data
+      // Reopening: clear completion data (the old proof no longer applies; completing again needs a new one)
       updateData.completedAt = null;
       updateData.onTime = null;
       updateData.approved = false;
       updateData.approvedAt = null;
+      updateData.proofUrl = null;
+      updateData.proofName = null;
     }
 
     await prisma.statusHistory.create({
@@ -96,6 +95,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     updateData.onTime = null;
     updateData.approved = false;
     updateData.approvedAt = null;
+    updateData.proofUrl = null;
+    updateData.proofName = null;
     await prisma.statusHistory.create({
       data: {
         taskId: id,
@@ -158,24 +159,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     },
   });
 
-  if (justCompleted) {
-    const messageId = await notifyTaskCompleted({
-      title: updated.title,
-      description: updated.description,
-      priority: updated.priority,
-      assigneeName: updated.assignee.name,
-      creatorName: updated.creator.name,
-      dueDate: updated.dueDate,
-      completedAt: updated.completedAt!,
-      onTime: updated.onTime,
-      isRework: updated.isRework,
-      reworkCount: updated.reworkCount,
-    });
-    if (messageId) {
-      await prisma.task.update({ where: { id }, data: { discordMessageId: messageId } });
-    }
-  }
-
   if (justApproved && updated.discordMessageId) {
     await notifyTaskApproved(updated.discordMessageId, {
       title: updated.title,
@@ -188,6 +171,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       onTime: updated.onTime,
       isRework: updated.isRework,
       reworkCount: updated.reworkCount,
+      proofUrl: updated.proofUrl,
     });
   }
 

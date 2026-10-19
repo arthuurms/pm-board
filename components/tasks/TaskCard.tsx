@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Task } from "@/types";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badge";
-import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2, ThumbsUp, Paperclip, AlertTriangle } from "lucide-react";
+import { Calendar, User2, RotateCcw, Clock, CheckCircle, XCircle, GripVertical, Plus, Minus, X, Pencil, Trash2, ThumbsUp, Paperclip, AlertTriangle, Image as ImageIcon } from "lucide-react";
 import clsx from "clsx";
 import { dayKeyOf } from "@/lib/dayKey";
 
@@ -308,6 +308,18 @@ export default function TaskCard({ task, permissions, onStatusChange, onMarkRewo
               <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-medium">
                 <ThumbsUp className="w-3 h-3" /> Tarefa correta
               </span>
+            )}
+            {task.proofUrl && (
+              <a
+                href={task.proofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-xs text-violet-700 bg-violet-50 px-2 py-0.5 rounded font-medium hover:opacity-80"
+                title="Ver a print da tarefa"
+              >
+                <ImageIcon className="w-3 h-3" /> Ver print
+              </a>
             )}
           </div>
         )}
