@@ -27,10 +27,10 @@ export interface ParseResult {
   isFollowUp: boolean;
 }
 
-const BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
-const DEFAULT_TIME = "18:00";
+export const BRT_OFFSET_MS = 3 * 60 * 60 * 1000;
+export const DEFAULT_TIME = "18:00";
 
-interface Range { start: number; end: number }
+export interface Range { start: number; end: number }
 
 export function norm(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -40,7 +40,7 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const pad = (n: number) => String(n).padStart(2, "0");
+export const pad = (n: number) => String(n).padStart(2, "0");
 const daysInMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const validYMD = (y: number, m: number, d: number) => m >= 1 && m <= 12 && d >= 1 && d <= daysInMonth(y, m);
 
@@ -51,7 +51,7 @@ function rangeOf(m: RegExpExecArray): Range {
 // ---------- priority ----------
 const PRIORITY_MAP: Record<string, Priority> = { urgente: "urgent", urgentissimo: "urgent", maxima: "urgent", alta: "high", media: "medium", baixa: "low" };
 
-function findPriority(n: string): { value: Priority; range: Range } | null {
+export function findPriority(n: string): { value: Priority; range: Range } | null {
   const tries = [
     /\bprioridade\s*(?:[:=-]\s*|e\s+|de\s+)?(urgente|maxima|alta|media|baixa)\b/,
     /\b(urgente|alta|media|baixa)\s+prioridade\b/,
@@ -65,7 +65,7 @@ function findPriority(n: string): { value: Priority; range: Range } | null {
 }
 
 // ---------- time ----------
-function findTime(n: string): { h: number; m: number; range: Range } | null {
+export function findTime(n: string): { h: number; m: number; range: Range } | null {
   const lead = "(?:\\b(?:ate|as|a)\\s+(?:as\\s+)?)?";
   let m = new RegExp(lead + "\\b([01]?\\d|2[0-3])\\s*(?::|h)\\s*([0-5]\\d)\\b").exec(n);
   if (m) return { h: +m[1], m: +m[2], range: rangeOf(m) };
@@ -81,7 +81,7 @@ const WEEKDAY_INDEX: Record<string, number> = { domingo: 0, segunda: 1, terca: 2
 // Every piece starts with \b: otherwise the article "a" could be taken from the end of a word ("transportadora hoje").
 const DATE_LEAD = "(?:\\b(?:para|pra|ate|no|em|na)\\s+)?(?:\\b(?:o|a)\\s+)?(?:\\b(?:dia|dai|data)\\s+)?";
 
-function findDate(n: string, today: string, firstLineEnd: number): { key: string; range: Range } | null {
+export function findDate(n: string, today: string, firstLineEnd: number): { key: string; range: Range } | null {
   const [ty, tm, td] = today.split("-").map(Number);
   let m: RegExpExecArray | null;
 
@@ -145,9 +145,9 @@ function findDate(n: string, today: string, firstLineEnd: number): { key: string
 }
 
 // ---------- assignee / tag ----------
-interface Person { id: string; name: string }
+export interface Person { id: string; name: string }
 
-function findAssignee(n: string, users: Person[], firstLineEnd: number): { user: Person; range: Range; ambiguous: boolean } | null {
+export function findAssignee(n: string, users: Person[], firstLineEnd: number): { user: Person; range: Range; ambiguous: boolean } | null {
   const firsts = users.map((u) => ({ u, f: norm(u.name).trim().split(/\s+/)[0] })).filter((x) => x.f);
   const byWord = (w: string): Person | null => {
     const exact = firsts.filter((x) => x.f === w);
@@ -179,7 +179,7 @@ function findAssignee(n: string, users: Person[], firstLineEnd: number): { user:
   return { user: pick.u, range: pick.range, ambiguous: hits.length > 1 };
 }
 
-function findTag(n: string, tags: Person[]): Person | null {
+export function findTag(n: string, tags: Person[]): Person | null {
   for (const t of tags) {
     const tn = norm(t.name).trim();
     if (tn && new RegExp("\\b" + escapeRe(tn) + "\\b").test(n)) return t;
@@ -188,23 +188,32 @@ function findTag(n: string, tags: Person[]): Person | null {
 }
 
 // ---------- text cleanup ----------
-function stripRanges(text: string, lineStart: number, ranges: Range[]): string {
+export function stripRanges(text: string, lineStart: number, ranges: Range[]): string {
   const lineEnd = lineStart + text.length;
   const cuts = ranges
     .filter((r) => r.start < lineEnd && r.end > lineStart)
     .map((r) => ({ start: Math.max(r.start, lineStart) - lineStart, end: Math.min(r.end, lineEnd) - lineStart }))
-    .sort((a, b) => b.start - a.start);
+    .sort((a, b) => a.start - b.start);
+  // Overlapping ranges must be merged first: cutting them one by one would also eat the text after them.
+  const merged: { start: number; end: number }[] = [];
+  for (const c of cuts) {
+    const last = merged[merged.length - 1];
+    if (last && c.start <= last.end) last.end = Math.max(last.end, c.end);
+    else merged.push({ ...c });
+  }
   let out = text;
-  for (const c of cuts) out = out.slice(0, c.start) + " " + out.slice(c.end);
+  for (let i = merged.length - 1; i >= 0; i--) out = out.slice(0, merged[i].start) + " " + out.slice(merged[i].end);
   return out;
 }
 
 const EDGE_WORD = "(?:para|pra|pro|o|a|os|as|ate|no|em|dia|dai|de|do|da|e|com|por|favor)";
 
-function cleanTitle(s: string, aggressive: boolean): string {
+export function cleanTitle(s: string, aggressive: boolean): string {
   let t = s.replace(/^[\s\-–—•*·.,;:]+/, "");
   if (aggressive) {
     t = t.replace(/^(?:passar|passa|criar|cria|abrir|abre|mandar|manda|enviar|envia|nova)?\s*(?:uma\s+)?tarefa\b[\s,.:;-]*/i, "");
+    // A command verb left alone before a colon/comma ("Criar: subir criativos"); never a verb that starts the real title.
+    t = t.replace(/^(?:passar|passa|criar|cria|abrir|abre|mandar|manda|enviar|envia|programar|aplicar|aplica|registrar|registre|colocar|coloque|adicionar|adicione)\s*[:,;-]\s*/i, "");
     for (let i = 0; i < 6; i++) {
       const next = t.replace(new RegExp("^" + EDGE_WORD + "\\b[\\s,.:;-]*", "i"), "");
       if (next === t) break;
@@ -220,7 +229,7 @@ function cleanTitle(s: string, aggressive: boolean): string {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
 }
 
-const STOP = new Set(["passar", "passa", "pra", "para", "pro", "o", "a", "os", "as", "dia", "dai", "ate", "de", "do", "da", "e", "tarefa", "criar", "cria", "nova", "mandar", "manda", "enviar", "envia", "favor", "por", "ok", "entao"]);
+export const STOP = new Set(["passar", "passa", "pra", "para", "pro", "o", "a", "os", "as", "dia", "dai", "ate", "de", "do", "da", "e", "tarefa", "criar", "cria", "nova", "mandar", "manda", "enviar", "envia", "favor", "por", "ok", "entao"]);
 
 export function formatDue(due: string): string {
   if (!due) return "";
