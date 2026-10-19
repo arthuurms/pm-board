@@ -388,20 +388,11 @@ export default function AssistentePage() {
           </div>
         )}
         {!current && error && <p className="text-sm text-red-600 mb-2">{error}</p>}
-        <div className={clsx("flex items-end gap-2 bg-white border rounded-2xl shadow-sm p-2 focus-within:border-violet-400", dragActive ? "border-violet-500" : "border-gray-200")}>
-          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} />
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="shrink-0 w-10 h-10 rounded-xl text-gray-500 flex items-center justify-center hover:text-violet-600 border border-gray-200 hover:border-violet-400 disabled:opacity-50"
-            title="Anexar foto"
-          >
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
-          </button>
+        <div className={clsx("bg-white border rounded-2xl shadow-sm focus-within:border-violet-400 transition-colors", dragActive ? "border-violet-500 bg-violet-50" : "border-gray-200")}>
           <textarea
-            className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm focus:outline-none max-h-48"
-            rows={current ? 1 : 3}
-            placeholder={current ? "Quer ajustar algo? Ex: amanhã 18h, prioridade urgente, para o Samuel" : "Cole o pedido aqui... (anexe fotos com o clipe ou Ctrl+V)"}
+            className="block w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-sm leading-relaxed focus:outline-none max-h-48"
+            rows={current ? 2 : 3}
+            placeholder={current ? "Quer ajustar algo? Ex: amanhã 18h, prioridade urgente, para o Samuel" : "Cole o pedido aqui..."}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onPaste={(e) => {
@@ -418,16 +409,30 @@ export default function AssistentePage() {
               }
             }}
           />
-          <button
-            onClick={send}
-            disabled={!input.trim() || creating || uploading}
-            className="shrink-0 w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Enviar (Enter)"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files?.length) addPhotos(e.target.files); e.target.value = ""; }} />
+          <div className="flex items-center justify-between gap-3 px-3 pb-2.5 pt-1">
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-gray-600 border border-gray-200 hover:border-violet-400 hover:text-violet-600 disabled:opacity-50"
+              title={`Anexar foto (até ${MAX_PHOTOS}). Também dá para arrastar ou colar com Ctrl+V.`}
+            >
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+              {uploading ? "Enviando..." : "Anexar foto"}
+            </button>
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[11px] text-gray-400">Enter envia · Shift+Enter quebra a linha</span>
+              <button
+                onClick={send}
+                disabled={!input.trim() || creating || uploading}
+                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Enviar (Enter)"
+              >
+                Enviar <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
-        <p className="text-[11px] text-gray-400 mt-1.5 px-1">Enter envia, Shift+Enter quebra a linha. Fotos: clipe, arrastar ou Ctrl+V (até {MAX_PHOTOS}).</p>
       </div>
     </div>
   );
